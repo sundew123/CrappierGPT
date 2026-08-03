@@ -129,7 +129,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vocabMap = []
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											additionalVocab |= set(list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\u") else x.encode(), next(csv.reader(vocab), []))))
+											additionalVocab |= set(list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 									if len(additionalVocab) > 0:
 										oldW = model.linear3.weight
 										model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
@@ -160,7 +160,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 											optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\u") else x.encode(), next(csv.reader(vocab), [])))))]
+											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 									for v in range(int(sys.argv[2])):
 										while os.path.isfile("output_" + str(v) + ".csv"):
 											if toBeAdded == None:
@@ -261,7 +261,7 @@ additionalVocab = set()
 vocabMap = []
 for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		additionalVocab |= set(list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\u") else x.encode(), next(csv.reader(vocab), []))))
+		additionalVocab |= set(list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 if len(additionalVocab) > 0:
 	oldW = model.linear3.weight
 	model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
@@ -292,7 +292,7 @@ if len(additionalVocab) > 0:
 		optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\u") else x.encode(), next(csv.reader(vocab), [])))))]
+		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytearray([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 for v in range(int(sys.argv[2])):
 	while os.path.isfile("output_" + str(v) + ".csv"):
 		if os.path.getsize("output_" + str(v) + ".csv") > 0 or toBeAdded != None:
