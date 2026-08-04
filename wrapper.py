@@ -204,8 +204,6 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 																param["lr"] = learning
 														optimizer.step()
 														rate += 1
-														if rate % 100 == 0:
-															print(lloss)
 														lloss = 0
 														model.zero_grad()
 														batchFill = 0
@@ -337,8 +335,6 @@ for v in range(int(sys.argv[2])):
 								param["lr"] = learning
 						optimizer.step()
 						rate += 1
-						if rate % 100 == 0:
-							print(lloss)
 						lloss = 0
 						model.zero_grad()
 						batchFill = 0
@@ -404,8 +400,6 @@ while replaceIndex < len(resivor):
 					param["lr"] = learning
 			optimizer.step()
 			rate += 1
-			if rate % 100 == 0:
-				print(lloss)
 			lloss = 0
 			model.zero_grad()
 			batchFill = 0
