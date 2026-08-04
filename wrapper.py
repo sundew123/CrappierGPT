@@ -488,8 +488,38 @@ class EvalNetwork(torch.nn.Module):
 		layer = self.layers(embed)
 		lin3 = self.linear3(layer)
 		return torch.log_softmax(lin3, dim=-1)
+class BufferStart(torch.nn.Module):
+	def  __init__(self):
+		super().__init__()
+		self.emb = torch.nn.Embedding(model.emb.weight.size(0), 768)
+		self.register_buffer("pos", (torch.fmod(torch.arange(self.emb.embedding_dim), 2).unsqueeze(0) * torch.sin(torch.arange(int(sys.argv[4])).unsqueeze(1) / torch.pow(torch.tensor(10000), torch.floor(torch.arange(self.emb.embedding_dim) / 2).unsqueeze(0) * 2 / self.emb.embedding_dim)) + (1 - torch.fmod(torch.arange(self.emb.embedding_dim), 2).unsqueeze(0)) * torch.cos(torch.arange(int(sys.argv[4])).unsqueeze(1) / torch.pow(torch.tensor(10000), torch.floor(torch.arange(self.emb.embedding_dim) / 2).unsqueeze(0) * 2 / self.emb.embedding_dim))))
+		self.temp = [EvalLayer(self.emb.embedding_dim, 12, 64) for _ in range(12)]
+		self.layers = torch.nn.Sequential(*self.temp)
+		self.linear3 = torch.nn.Linear(self.emb.embedding_dim, model.emb.weight.size(0), bias=False)
+	def forward(self, x):
+		embed = x + self.pos[:x.size(-2), :].unsqueeze(0)
+		layer = self.layers(embed)
+		lin3 = self.linear3(layer)
+		return torch.log_softmax(lin3, dim=-1)
 evalModel = EvalNetwork()
 evalModel.load_state_dict(model._orig_mod.state_dict())
 del model
+for param in evalModel.parameters():
+	param.requires_grad = False
 evalModel.to("cuda")
 torch.jit.trace(evalModel, torch.randint(evalModel.emb.weight.size(0), (1, int(sys.argv[4]))).to("cuda")).save("model.pt")
+evalModel = torch.compile(evalModel)
+startGen = BufferStart()
+startGen.load_state_dict(evalModel._orig_mod.state_dict())
+for param in startGen.parameters():
+	param.requires_grad = False
+cBuffer = torch.multinomial(torch.exp(startGen(torch.zeros(1, 1, 768)).view(-1)), 1).to("cuda").unsqueeze(-1)
+vocab = []
+with open("vocab.csv", encoding="utf-8", errors="replace") as f:
+	vocab = next(csv.reader(f), [])
+while True:
+	print(vocab[cBuffer[0, -1]], end="")
+	if cBuffer.size(-1) < int(sys.argv[4]):
+		cBuffer = torch.cat((cBuffer, torch.multinomial(torch.exp(evalModel(cBuffer)[0, -1, :]), 1).unsqueeze(-1)), -1)
+	else:
+		cBuffer = torch.cat((cBuffer[:, 1:], torch.multinomial(torch.exp(evalModel(cBuffer)[0, -1, :]), 1).unsqueeze(-1)), -1)
