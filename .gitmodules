@@ -1,3 +1,0 @@
-[submodule "training data"]
-	path = training data
-	url = https://huggingface.co/datasets/segyges/OpenWebText2
