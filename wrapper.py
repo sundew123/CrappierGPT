@@ -507,7 +507,7 @@ startGen = BufferStart()
 startGen.load_state_dict(evalModel._orig_mod.state_dict())
 for param in startGen.parameters():
 	param.requires_grad = False
-cBuffer = torch.multinomial(torch.exp(startGen(evalModel.emb.weight.mean(0).to("cpu")).view(-1)), 1).to("cuda").unsqueeze(-1)
+cBuffer = torch.multinomial(torch.exp(startGen(evalModel.emb.weight.mean(0, keepdim=True).to("cpu")).view(-1)), 1).to("cuda").unsqueeze(-1)
 vocab = []
 with open("vocab.csv", encoding="utf-8", errors="replace") as f:
 	vocab = next(csv.reader(f), [])
