@@ -389,7 +389,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 	}
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < pow(2, wrappedString[i].entropy + scaling) || j < 1; j++) {
+			for (size_t j = 0; j < wrappedString[i].entropy / log2(exp(1.0)) * scaling; j++) {
 				if (pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * ((unsigned int)RAND_MAX + 1u) > rand()) {
 					size_t vPos = i;
 					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {

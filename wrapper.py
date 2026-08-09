@@ -27,16 +27,16 @@ def pThread(c, p, pQueue, iQ):
 process = [None] * int(sys.argv[2])
 resivor = [None] * int(sys.argv[3])
 rsize = 0
-batchSize = 128 * int(sys.argv[4])
+batchSize = 96 * int(sys.argv[4])
 batchFill = 0
-batchCap = 12500 * int(sys.argv[4])
+batchCap = 9375 * int(sys.argv[4])
 resFill = 0
 step = 0
 toBeAdded = None
 max_rate = 6e-4
 min_rate = 6e-5
-warmup = 8000
-max_iters = 2400000
+warmup = 6000
+max_iters = 1800000
 class MaskedAttention(torch.nn.Module):
 	def __init__(self, emb_dim, heads, dims):
 		super().__init__()
@@ -96,7 +96,7 @@ iQueue = queue.Queue()
 pprocess = [None] * int(sys.argv[2])
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8, fused=True)
 for i in range(int(sys.argv[2])):
-	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "-1227.62"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "0.003"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 	process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
 	process[i].start()
 	iQueue.put(i)
@@ -256,7 +256,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vLen += len(list(additionalVocab))
 									process = [None] * int(sys.argv[2])
 									for i in range(int(sys.argv[2])):
-										pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "-1227.62"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+										pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "0.003"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 										process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
 										process[i].start()
 										iQueue.put(i)
