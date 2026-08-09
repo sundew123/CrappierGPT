@@ -123,17 +123,17 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									tQueue[count].put(rawWritten)
 									batch += 1
 								if batch == int(sys.argv[1]):
-									for t in tQueue:
-										t.put(None)
-									for t in process:
-										t.join()
+									for tt in tQueue:
+										tt.put(None)
+									for tt in process:
+										tt.join()
 									while not iQueue.empty():
 										iQueue.get_nowait()
-									for t in range(int(sys.argv[2])):
-										size = int(pprocess[t].communicate()[0])
-										if pprocess[t].returncode == 1:
+									for tt in range(int(sys.argv[2])):
+										size = int(pprocess[tt].communicate()[0])
+										if pprocess[tt].returncode == 1:
 											sys.exit(1)
-										with open("output_" + str(t) + ".csv", "r+b") as f:
+										with open("output_" + str(tt) + ".csv", "r+b") as f:
 											f.truncate(size)
 									batch = 0
 									additionalVocab = set()
