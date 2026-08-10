@@ -387,17 +387,93 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 		queueStart = (queueStart == 0) ? (maxLen - 1) : (queueStart - 1);
 		i++;
 	}
+	double sumExpVal = 0;
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < wrappedString[i].entropy / log2(exp(1.0)) * scaling; j++) {
-				if (pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * ((unsigned int)RAND_MAX + 1u) > rand()) {
-					size_t vPos = i;
-					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
-						double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
-						size_t ind = 0;
-						size_t lastValid;
-						size_t lastInd;
-						for (struct node *l = *vocab; random >= 0 && l != NULL; l = l->next) {
+			for (size_t j = 0; j < round(sumExpVal + fmax(pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * wrappedString[i].entropy / log2(exp(1.0)) * scaling)) - round(sumExpVal); j++) {
+				size_t vPos = i;
+				for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
+					double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
+					size_t ind = 0;
+					size_t lastValid;
+					size_t lastInd;
+					for (struct node *l = *vocab; random >= 0 && l != NULL; l = l->next) {
+						size_t compDist = 0;
+						char match = 1;
+						size_t m = vPos;
+						for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
+							char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
+							l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
+							if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
+								match = 0;
+							}
+							l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
+							compDist += strlen(wrappedString[m].content);
+						}
+						if (compDist != strlen(l->vocab)) {
+							match = 0;
+						}
+						if (match) {
+							if (m == numCodepoints) {
+								random -= pow(2, -wrappedString[vPos].logTokenizations);
+							} else {
+								random -= pow(2, wrappedString[m].logTokenizations - wrappedString[vPos].logTokenizations);
+							}
+							lastValid = m;
+							lastInd = ind;
+						}
+						if (random >= 0 && l->next != NULL) {
+							ind++;
+						} else {
+							vPos = lastValid;
+						}
+					}
+					ind = lastInd;
+					if (vPos < numCodepoints) {
+						if (!k && *startPoint > 0) {
+							if (fwrite("\n", sizeof(char), 1, dump) != 1) {
+								free(buffer);
+								free(checksum);
+								free(scratch);
+								return -1;
+							}
+							(*startPoint)++;
+						}
+						if (k) {
+							if (fwrite(",", sizeof(char), 1, dump) != 1) {
+								free(buffer);
+								free(checksum);
+								free(scratch);
+								return -1;
+							}
+							(*startPoint)++;
+						}
+						if (fwrite("\"", sizeof(char), 1, dump) != 1) {
+							free(buffer);
+							free(checksum);
+							free(scratch);
+							return -1;
+						}
+						(*startPoint)++;
+						int numWritten;
+						if ((numWritten = fprintf(dump, "%zu", ind)) < 0) {
+							free(buffer);
+							free(checksum);
+							free(scratch);
+							return -1;
+						}
+						*startPoint += numWritten;
+						if (fwrite(",", sizeof(char), 1, dump) != 1) {
+							free(buffer);
+							free(checksum);
+							free(scratch);
+							return -1;
+						}
+						(*startPoint)++;
+						size_t maxVocab = 0;
+						ind = 0;
+						size_t maxInd = 0;
+						for (struct node *l = *vocab; l != NULL; l = l->next) {
 							size_t compDist = 0;
 							char match = 1;
 							size_t m = vPos;
@@ -415,113 +491,37 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							}
 							if (match) {
 								if (m == numCodepoints) {
-									random -= pow(2, -wrappedString[vPos].logTokenizations);
+									if (wrappedString[vPos].numTokens == 1 && strlen(l->vocab) > maxVocab) {
+										maxVocab = strlen(l->vocab);
+										maxInd = ind;
+									}
 								} else {
-									random -= pow(2, wrappedString[m].logTokenizations - wrappedString[vPos].logTokenizations);
-								}
-								lastValid = m;
-								lastInd = ind;
-							}
-							if (random >= 0 && l->next != NULL) {
-								ind++;
-							} else {
-								vPos = lastValid;
-							}
-						}
-						ind = lastInd;
-						if (vPos < numCodepoints) {
-							if (!k && *startPoint > 0) {
-								if (fwrite("\n", sizeof(char), 1, dump) != 1) {
-									free(buffer);
-									free(checksum);
-									free(scratch);
-									return -1;
-								}
-								(*startPoint)++;
-							}
-							if (k) {
-								if (fwrite(",", sizeof(char), 1, dump) != 1) {
-									free(buffer);
-									free(checksum);
-									free(scratch);
-									return -1;
-								}
-								(*startPoint)++;
-							}
-							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
-								free(buffer);
-								free(checksum);
-								free(scratch);
-								return -1;
-							}
-							(*startPoint)++;
-							int numWritten;
-							if ((numWritten = fprintf(dump, "%zu", ind)) < 0) {
-								free(buffer);
-								free(checksum);
-								free(scratch);
-								return -1;
-							}
-							*startPoint += numWritten;
-							if (fwrite(",", sizeof(char), 1, dump) != 1) {
-								free(buffer);
-								free(checksum);
-								free(scratch);
-								return -1;
-							}
-							(*startPoint)++;
-							size_t maxVocab = 0;
-							ind = 0;
-							size_t maxInd = 0;
-							for (struct node *l = *vocab; l != NULL; l = l->next) {
-								size_t compDist = 0;
-								char match = 1;
-								size_t m = vPos;
-								for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
-									char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
-									l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
-									if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
-										match = 0;
-									}
-									l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
-									compDist += strlen(wrappedString[m].content);
-								}
-								if (compDist != strlen(l->vocab)) {
-									match = 0;
-								}
-								if (match) {
-									if (m == numCodepoints) {
-										if (wrappedString[vPos].numTokens == 1 && strlen(l->vocab) > maxVocab) {
-											maxVocab = strlen(l->vocab);
-											maxInd = ind;
-										}
-									} else {
-										if (wrappedString[vPos].numTokens == wrappedString[m].numTokens + 1 && strlen(l->vocab) > maxVocab) {
-											maxVocab = strlen(l->vocab);
-											maxInd = ind;
-										}
+									if (wrappedString[vPos].numTokens == wrappedString[m].numTokens + 1 && strlen(l->vocab) > maxVocab) {
+										maxVocab = strlen(l->vocab);
+										maxInd = ind;
 									}
 								}
-								ind++;
 							}
-							if ((numWritten = fprintf(dump, "%zu", maxInd)) < 0) {
-								free(buffer);
-								free(checksum);
-								free(scratch);
-								return -1;
-							}
-							*startPoint += numWritten;
-							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
-								free(buffer);
-								free(checksum);
-								free(scratch);
-								return -1;
-							}
-							(*startPoint)++;
+							ind++;
 						}
+						if ((numWritten = fprintf(dump, "%zu", maxInd)) < 0) {
+							free(buffer);
+							free(checksum);
+							free(scratch);
+							return -1;
+						}
+						*startPoint += numWritten;
+						if (fwrite("\"", sizeof(char), 1, dump) != 1) {
+							free(buffer);
+							free(checksum);
+							free(scratch);
+							return -1;
+						}
+						(*startPoint)++;
 					}
 				}
 			}
+			sumExpVal += fmax(pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * wrappedString[i].entropy / log2(exp(1.0)) * scaling);
 		}
 	}
 	free(buffer);
