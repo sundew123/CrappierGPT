@@ -106,7 +106,6 @@ toBeAdded = None
 model.zero_grad()
 source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-lloss = 0
 with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 	tarMembers = t.getmembers()
 	random.shuffle(tarMembers)
@@ -201,7 +200,6 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 													if batchFill == batchSize or source.size(0) == 16:
 														with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
 															loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
-															lloss += loss.item()
 															loss.backward()
 														source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 														target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
@@ -339,7 +337,6 @@ for v in range(int(sys.argv[2])):
 				if batchFill == batchSize or source.size(0) == 16:
 					with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
 						loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
-						lloss += loss.item()
 						loss.backward()
 					source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 					target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
@@ -403,7 +400,6 @@ while replaceIndex < len(resivor):
 	if batchFill == batchSize or source.size(0) == 16:
 		with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
 			loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
-			lloss += loss.item()
 			loss.backward()
 		source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 		target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
