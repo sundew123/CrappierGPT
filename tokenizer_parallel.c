@@ -293,9 +293,34 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 			}
 		}
 	}
+	double *tailEntropy = malloc(maxLen * (context - 1) * sizeof(double));
+	if (tailEntropy == NULL) {
+		free(buffer);
+		free(scratch);
+		free(checksum);
+		return -1;
+	}
+	char *tailValid = malloc(maxLen * (context - 1) * sizeof(char));
+	if (tailValid == NULL) {
+		free(buffer);
+		free(scratch);
+		free(checksum);
+		free(tailEntropy);
+		return -1;
+	}
+	double *leftovers = malloc(maxLen * (context - 1) * sizeof(double));
+	if (leftovers == NULL) {
+		free(buffer);
+		free(scratch);
+		free(checksum);
+		free(tailEntropy);
+		free(tailValid);
+		return -1;
+	}
 	for (size_t i = 0; i < maxLen * (context - 1); i++) {
 		buffer[i] = 0;
 		checksum[i] = 0;
+		tailValid[i] = 0;
 	}
 	for (size_t i = numCodepoints; i > 0; i--) {
 		i--;
@@ -366,19 +391,64 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 		for (size_t j = 0; j < context - 2; j++) {
 			checksum[maxLen * j + queueStart] = 0;
 			buffer[maxLen * j + queueStart] = 0;
+			tailValid[maxLen * j + queueStart] = 0;
+			tailEntropy[maxLen * j + queueStart] = 0;
+			leftovers[maxLen * j + queueStart] = 0;
+			double maxLeft = log2(0);
+			for (size_t k = 0; k < maxLen; k++) {
+				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
+					if (maxLeft < leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
+						maxLeft = leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] + wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations;
+					}
+				}
+			}
+			for (size_t k = 0; k < maxLen; k++) {
+				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
+					if (maxLeft != log2(0)) {
+						leftovers[maxLen * j + queueStart] += pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] + wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations - maxLeft);
+					}
+				}
+			}
+			if (maxLeft != log2(0)) {
+				leftovers[maxLen * j + queueStart] = maxLeft + log2(leftovers[maxLen * j + queueStart]);
+			} else {
+				leftovers[maxLen * j + queueStart] = log2(0);
+			}
 			for (size_t k = 0; k < maxLen; k++) {
 				if (scratch[k] && (i + k + 1 == numCodepoints || checksum[maxLen * (j + 1) + (queueStart + k + 1) % maxLen])) {
 					checksum[maxLen * j + queueStart] = 1;
 					buffer[maxLen * j + queueStart] += (i + k + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + k + 1].logTokenizations + wrappedString[i].logTokenizations + buffer[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]));
 				}
+				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
+					tailValid[maxLen * j + queueStart] = 1;
+					tailEntropy[maxLen * j + queueStart] += pow(2, wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations) * (pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) * (-wrappedString[i + k + 1].logTokenizations + wrappedString[i].logTokenizations) + tailEntropy[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]);
+				}
 			}
 		}
 		checksum[maxLen * (context - 2) + queueStart] = 0;
 		buffer[maxLen * (context - 2) + queueStart] = 0;
+		tailValid[maxLen * (context - 2) + queueStart] = 0;
+		tailEntropy[maxLen * (context - 2) + queueStart] = 0;
 		for (size_t j = 0; j < maxLen; j++) {
 			if (scratch[j] && (i + j + 1 == numCodepoints || wrappedString[i + j + 1].valid)) {
 				checksum[maxLen * (context - 2) + queueStart] = 1;
 				buffer[maxLen * (context - 2) + queueStart] += (i + j + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + j + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + j + 1].logTokenizations + wrappedString[i].logTokenizations));
+				if (i + j + 1 == numCodepoints) {
+					tailValid[maxLen * (context - 2) + queueStart] = 1;
+					tailEntropy[maxLen * (context - 2) + queueStart] += pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations;
+					leftovers[maxLen * (context - 2) + queueStart] = -wrappedString[i].logTokenizations;
+				}
+			}
+		}
+		if (wrappedString[i].valid) {
+			for (size_t j = 0; j < context - 1; j++) {
+				if (tailValid[maxLen * j + queueStart]) {
+					wrappedString[i].entropy -= tailEntropy[maxLen * j + queueStart];
+				}
+			}
+			wrappedString[i].entropy /= context;
+			for (size_t j = context - 1; j > 0; j--) {
+				wrappedString[i].entropy += tailEntropy[maxLen * (j - 1) + queueStart] / (context - j);
 			}
 		}
 		for (size_t j = 0; j < maxLen; j++) {
@@ -387,6 +457,9 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 		queueStart = (queueStart == 0) ? (maxLen - 1) : (queueStart - 1);
 		i++;
 	}
+	free(tailValid);
+	free(tailEntropy);
+	free(leftovers);
 	double sumExpVal = 0;
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
