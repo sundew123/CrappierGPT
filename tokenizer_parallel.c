@@ -293,34 +293,15 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 			}
 		}
 	}
-	double *tailEntropy = malloc(maxLen * (context - 1) * sizeof(double));
-	if (tailEntropy == NULL) {
-		free(buffer);
-		free(scratch);
-		free(checksum);
-		return -1;
-	}
-	char *tailValid = malloc(maxLen * (context - 1) * sizeof(char));
-	if (tailValid == NULL) {
-		free(buffer);
-		free(scratch);
-		free(checksum);
-		free(tailEntropy);
-		return -1;
-	}
+	free(checksum);
 	double *leftovers = malloc(maxLen * (context - 1) * sizeof(double));
 	if (leftovers == NULL) {
 		free(buffer);
 		free(scratch);
-		free(checksum);
-		free(tailEntropy);
-		free(tailValid);
 		return -1;
 	}
 	for (size_t i = 0; i < maxLen * (context - 1); i++) {
 		buffer[i] = 0;
-		checksum[i] = 0;
-		tailValid[i] = 0;
 	}
 	for (size_t i = numCodepoints; i > 0; i--) {
 		i--;
@@ -383,73 +364,48 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 		}
 		if (wrappedString[i].valid) {
 			for (size_t j = 0; j < maxLen; j++) {
-				if (scratch[j] && (i + j + 1 == numCodepoints || checksum[(queueStart + j + 1) % maxLen])) {
+				if (scratch[j]) {
 					wrappedString[i].entropy += (i + j + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + j + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + j + 1].logTokenizations + wrappedString[i].logTokenizations + buffer[(queueStart + j + 1) % maxLen]));
 				}
 			}
 		}
 		for (size_t j = 0; j < context - 2; j++) {
-			checksum[maxLen * j + queueStart] = 0;
 			buffer[maxLen * j + queueStart] = 0;
-			tailValid[maxLen * j + queueStart] = 0;
-			tailEntropy[maxLen * j + queueStart] = 0;
 			leftovers[maxLen * j + queueStart] = 0;
 			double maxLeft = log2(0);
 			for (size_t k = 0; k < maxLen; k++) {
-				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
-					if (maxLeft < leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
-						maxLeft = leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] + wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations;
+				if (scratch[k]) {
+					buffer[maxLen * j + queueStart] += (i + k + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + k + 1].logTokenizations + wrappedString[i].logTokenizations + buffer[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]));
+					if (i + k + 1 < numCodepoints && maxLeft < leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
+						maxLeft = leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen];
 					}
 				}
 			}
 			for (size_t k = 0; k < maxLen; k++) {
-				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
-					if (maxLeft != log2(0)) {
-						leftovers[maxLen * j + queueStart] += pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] + wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations - maxLeft);
-					}
+				if (maxLeft != log2(0) && i + k + 1 < numCodepoints && scratch[k]) {
+					leftovers[maxLen * j + queueStart] += pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] - maxLeft);
 				}
 			}
-			if (maxLeft != log2(0)) {
+			if (leftovers[maxLen * j + queueStart]) {
 				leftovers[maxLen * j + queueStart] = maxLeft + log2(leftovers[maxLen * j + queueStart]);
 			} else {
 				leftovers[maxLen * j + queueStart] = log2(0);
 			}
-			for (size_t k = 0; k < maxLen; k++) {
-				if (scratch[k] && (i + k + 1 == numCodepoints || checksum[maxLen * (j + 1) + (queueStart + k + 1) % maxLen])) {
-					checksum[maxLen * j + queueStart] = 1;
-					buffer[maxLen * j + queueStart] += (i + k + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + k + 1].logTokenizations + wrappedString[i].logTokenizations + buffer[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]));
-				}
-				if (scratch[k] && i + k + 1 < numCodepoints && tailValid[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) {
-					tailValid[maxLen * j + queueStart] = 1;
-					tailEntropy[maxLen * j + queueStart] += pow(2, wrappedString[i + k + 1].logTokenizations - wrappedString[i].logTokenizations) * (pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]) * (-wrappedString[i + k + 1].logTokenizations + wrappedString[i].logTokenizations) + tailEntropy[maxLen * (j + 1) + (queueStart + k + 1) % maxLen]);
-				}
-			}
 		}
-		checksum[maxLen * (context - 2) + queueStart] = 0;
 		buffer[maxLen * (context - 2) + queueStart] = 0;
-		tailValid[maxLen * (context - 2) + queueStart] = 0;
-		tailEntropy[maxLen * (context - 2) + queueStart] = 0;
+		leftovers[maxLen * (context - 2) + queueStart] = log2(0);
 		for (size_t j = 0; j < maxLen; j++) {
-			if (scratch[j] && (i + j + 1 == numCodepoints || wrappedString[i + j + 1].valid)) {
-				checksum[maxLen * (context - 2) + queueStart] = 1;
+			if (scratch[j]) {
 				buffer[maxLen * (context - 2) + queueStart] += (i + j + 1 == numCodepoints) ? (pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations) : (pow(2, wrappedString[i + j + 1].logTokenizations - wrappedString[i].logTokenizations) * (-wrappedString[i + j + 1].logTokenizations + wrappedString[i].logTokenizations));
 				if (i + j + 1 == numCodepoints) {
-					tailValid[maxLen * (context - 2) + queueStart] = 1;
-					tailEntropy[maxLen * (context - 2) + queueStart] += pow(2, -wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations;
-					leftovers[maxLen * (context - 2) + queueStart] = -wrappedString[i].logTokenizations;
+					leftovers[maxLen * (context - 2) + queueStart] = 0;
 				}
 			}
 		}
-		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < context - 1; j++) {
-				if (tailValid[maxLen * j + queueStart]) {
-					wrappedString[i].entropy -= tailEntropy[maxLen * j + queueStart];
-				}
-			}
-			wrappedString[i].entropy /= context;
-			for (size_t j = context - 1; j > 0; j--) {
-				wrappedString[i].entropy += tailEntropy[maxLen * (j - 1) + queueStart] / (context - j);
-			}
+		wrappedString[i].entropy /= context;
+		for (size_t j = 0; j < context - 1; j++) {
+			double subEntropy = pow(2, leftovers[maxLen * j + queueStart] - wrappedString[i].logTokenizations) * wrappedString[i].logTokenizations;
+			wrappedString[i].entropy += subEntropy / (context - 1 - j) - subEntropy / context;
 		}
 		for (size_t j = 0; j < maxLen; j++) {
 			scratch[j] = 0;
@@ -457,13 +413,11 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 		queueStart = (queueStart == 0) ? (maxLen - 1) : (queueStart - 1);
 		i++;
 	}
-	free(tailValid);
-	free(tailEntropy);
 	free(leftovers);
 	double sumExpVal = 0;
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < round(sumExpVal + fmax(pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * wrappedString[i].entropy / log2(exp(1.0)) * scaling)) - round(sumExpVal); j++) {
+			if (round(sumExpVal + pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)) - round(sumExpVal) > 0) {
 				size_t vPos = i;
 				for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
 					double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
@@ -594,12 +548,212 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 					}
 				}
 			}
-			sumExpVal += fmax(pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * wrappedString[i].entropy / log2(exp(1.0)) * scaling);
+			sumExpVal += pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
+		}
+	}
+	double meanStarts = 0;
+	for (size_t i = 0; i < numCodepoints; i++) {
+		if (wrappedString[i].valid) {
+			meanStarts += pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling);
+		}
+	}
+	double *probsStarts = malloc(((size_t)meanStarts + 1) * sizeof(double));
+	if (probsStarts == NULL) {
+		free(buffer);
+		free(scratch);
+		return -1;
+	}
+	probsStarts[0] = 0;
+	for (size_t i = 1; i < (size_t)meanStarts + 1; i++) {
+		probsStarts[i] = log2(0);
+	}
+	for (size_t i = numCodepoints; i > 0; i--) {
+		i--;
+		if (wrappedString[i].valid) {
+			for (size_t j = 0; j < (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling); j++) {
+				for (size_t k = (size_t)meanStarts; k > 0; k--) {
+					double temp1 = wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1];
+					double temp2 = log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)) + probsStarts[k];
+					if (fmax(temp1, temp2) != log2(0)) {
+						probsStarts[k] = fmax(temp1, temp2) + log2(pow(2, temp1 - fmax(temp1, temp2)) + pow(2, temp2 - fmax(temp1, temp2)));
+					} else {
+						probsStarts[k] = log2(0);
+					}
+				}
+				probsStarts[0] += log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
+			}
+		}
+		i++;
+	}
+	size_t startsLeft = (size_t)meanStarts;
+	for (size_t i = 0; i < numCodepoints && startsLeft > 0; i++) {
+		if (wrappedString[i].valid) {
+			for (size_t j = 0; j < (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling) && startsLeft > 0; j++) {
+				char stepDown = 0;
+				if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
+					probsStarts[0] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
+				} else {
+					probsStarts[0] = probsStarts[1];
+				}
+				for (size_t k = 1; k < startsLeft; k++) {
+					if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
+						double temp1 = fmax(probsStarts[k], wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1]);
+						probsStarts[k] = temp1 + log2(pow(2, probsStarts[k] - temp1) - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1] - temp1));
+						probsStarts[k] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
+					} else {
+						probsStarts[k] = probsStarts[k + 1];
+					}
+				}
+				double probStepDown = pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1] - probsStarts[startsLeft]);
+				if (!isfinite(probStepDown)) {
+					probStepDown = pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
+				}
+				stepDown = (probStepDown * ((unsigned int)RAND_MAX + 1u) > rand());
+				double temp1 = fmax(probsStarts[startsLeft], wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1]);
+				probsStarts[startsLeft] = temp1 + log2(pow(2, probsStarts[startsLeft] - temp1) - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1] - temp1));
+				if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
+					probsStarts[startsLeft] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
+				} else {
+					probsStarts[startsLeft] = log2(0);
+				}
+				if (stepDown) {
+					startsLeft--;
+					size_t vPos = i;
+					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
+						double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
+						size_t ind = 0;
+						size_t lastValid;
+						size_t lastInd;
+						for (struct node *l = *vocab; random >= 0 && l != NULL; l = l->next) {
+							size_t compDist = 0;
+							char match = 1;
+							size_t m = vPos;
+							for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
+								char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
+								l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
+								if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
+									match = 0;
+								}
+								l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
+								compDist += strlen(wrappedString[m].content);
+							}
+							if (compDist != strlen(l->vocab)) {
+								match = 0;
+							}
+							if (match) {
+								if (m == numCodepoints) {
+									random -= pow(2, -wrappedString[vPos].logTokenizations);
+								} else {
+									random -= pow(2, wrappedString[m].logTokenizations - wrappedString[vPos].logTokenizations);
+								}
+								lastValid = m;
+								lastInd = ind;
+							}
+							if (random >= 0 && l->next != NULL) {
+								ind++;
+							} else {
+								vPos = lastValid;
+							}
+						}
+						ind = lastInd;
+						if (vPos < numCodepoints) {
+							if (!k && *startPoint > 0) {
+								if (fwrite("\n", sizeof(char), 1, dump) != 1) {
+									free(buffer);
+									free(scratch);
+									free(probsStarts);
+									return -1;
+								}
+								(*startPoint)++;
+							}
+							if (k) {
+								if (fwrite(",", sizeof(char), 1, dump) != 1) {
+									free(buffer);
+									free(scratch);
+									free(probsStarts);
+									return -1;
+								}
+								(*startPoint)++;
+							}
+							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
+								free(buffer);
+								free(scratch);
+								free(probsStarts);
+								return -1;
+							}
+							(*startPoint)++;
+							int numWritten;
+							if ((numWritten = fprintf(dump, "%zu", ind)) < 0) {
+								free(buffer);
+								free(scratch);
+								free(probsStarts);
+								return -1;
+							}
+							*startPoint += numWritten;
+							if (fwrite(",", sizeof(char), 1, dump) != 1) {
+								free(buffer);
+								free(scratch);
+								free(probsStarts);
+								return -1;
+							}
+							(*startPoint)++;
+							size_t maxVocab = 0;
+							ind = 0;
+							size_t maxInd = 0;
+							for (struct node *l = *vocab; l != NULL; l = l->next) {
+								size_t compDist = 0;
+								char match = 1;
+								size_t m = vPos;
+								for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
+									char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
+									l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
+									if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
+										match = 0;
+									}
+									l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
+									compDist += strlen(wrappedString[m].content);
+								}
+								if (compDist != strlen(l->vocab)) {
+									match = 0;
+								}
+								if (match) {
+									if (m == numCodepoints) {
+										if (wrappedString[vPos].numTokens == 1 && strlen(l->vocab) > maxVocab) {
+											maxVocab = strlen(l->vocab);
+											maxInd = ind;
+										}
+									} else {
+										if (wrappedString[vPos].numTokens == wrappedString[m].numTokens + 1 && strlen(l->vocab) > maxVocab) {
+											maxVocab = strlen(l->vocab);
+											maxInd = ind;
+										}
+									}
+								}
+								ind++;
+							}
+							if ((numWritten = fprintf(dump, "%zu", maxInd)) < 0) {
+								free(buffer);
+								free(scratch);
+								free(probsStarts);
+								return -1;
+							}
+							*startPoint += numWritten;
+							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
+								free(buffer);
+								free(scratch);
+								free(probsStarts);
+								return -1;
+							}
+							(*startPoint)++;
+						}
+					}
+				}
+			}
 		}
 	}
 	free(buffer);
-	free(checksum);
 	free(scratch);
+	free(probsStarts);
 	return 0;
 }
 struct node *getVocab(FILE *vocabFile) {
