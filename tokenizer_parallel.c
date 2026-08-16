@@ -551,73 +551,15 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 			sumExpVal += pow(2, wrappedString[i].sampleLog - wrappedString[0].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
 		}
 	}
-	double meanStarts = 0;
+	double unlikelihood = 0;
+	double randThresh = rand();
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
-			meanStarts += pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations) * (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling);
-		}
-	}
-	double *probsStarts = malloc(((size_t)meanStarts + 1) * sizeof(double));
-	if (probsStarts == NULL) {
-		free(buffer);
-		free(scratch);
-		return -1;
-	}
-	probsStarts[0] = 0;
-	for (size_t i = 1; i < (size_t)meanStarts + 1; i++) {
-		probsStarts[i] = log2(0);
-	}
-	for (size_t i = numCodepoints; i > 0; i--) {
-		i--;
-		if (wrappedString[i].valid) {
 			for (size_t j = 0; j < (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling); j++) {
-				for (size_t k = (size_t)meanStarts; k > 0; k--) {
-					double temp1 = wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1];
-					double temp2 = log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)) + probsStarts[k];
-					if (fmax(temp1, temp2) != log2(0)) {
-						probsStarts[k] = fmax(temp1, temp2) + log2(pow(2, temp1 - fmax(temp1, temp2)) + pow(2, temp2 - fmax(temp1, temp2)));
-					} else {
-						probsStarts[k] = log2(0);
-					}
-				}
-				probsStarts[0] += log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
-			}
-		}
-		i++;
-	}
-	size_t startsLeft = (size_t)meanStarts;
-	for (size_t i = 0; i < numCodepoints && startsLeft > 0; i++) {
-		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling) && startsLeft > 0; j++) {
-				char stepDown = 0;
-				if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
-					probsStarts[0] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
-				} else {
-					probsStarts[0] = probsStarts[1];
-				}
-				for (size_t k = 1; k < startsLeft; k++) {
-					if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
-						double temp1 = fmax(probsStarts[k], wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1]);
-						probsStarts[k] = temp1 + log2(pow(2, probsStarts[k] - temp1) - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[k - 1] - temp1));
-						probsStarts[k] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
-					} else {
-						probsStarts[k] = probsStarts[k + 1];
-					}
-				}
-				double probStepDown = pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1] - probsStarts[startsLeft]);
-				if (!isfinite(probStepDown)) {
-					probStepDown = pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
-				}
-				stepDown = (probStepDown * ((unsigned int)RAND_MAX + 1u) > rand());
-				double temp1 = fmax(probsStarts[startsLeft], wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1]);
-				probsStarts[startsLeft] = temp1 + log2(pow(2, probsStarts[startsLeft] - temp1) - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations + probsStarts[startsLeft - 1] - temp1));
-				if (isfinite(log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)))) {
-					probsStarts[startsLeft] -= log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
-				} else {
-					probsStarts[startsLeft] = log2(0);
-				}
-				if (stepDown) {
-					startsLeft--;
+				unlikelihood += log2(1 - pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations));
+				if ((1 - pow(2, unlikelihood)) * ((unsigned int)RAND_MAX + 1u) > randThresh) {
+					unlikelihood = 0;
+					randThresh = rand();
 					size_t vPos = i;
 					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
 						double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
@@ -661,7 +603,6 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 								if (fwrite("\n", sizeof(char), 1, dump) != 1) {
 									free(buffer);
 									free(scratch);
-									free(probsStarts);
 									return -1;
 								}
 								(*startPoint)++;
@@ -670,7 +611,6 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 								if (fwrite(",", sizeof(char), 1, dump) != 1) {
 									free(buffer);
 									free(scratch);
-									free(probsStarts);
 									return -1;
 								}
 								(*startPoint)++;
@@ -678,7 +618,6 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
 								free(buffer);
 								free(scratch);
-								free(probsStarts);
 								return -1;
 							}
 							(*startPoint)++;
@@ -686,14 +625,12 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							if ((numWritten = fprintf(dump, "%zu", ind)) < 0) {
 								free(buffer);
 								free(scratch);
-								free(probsStarts);
 								return -1;
 							}
 							*startPoint += numWritten;
 							if (fwrite(",", sizeof(char), 1, dump) != 1) {
 								free(buffer);
 								free(scratch);
-								free(probsStarts);
 								return -1;
 							}
 							(*startPoint)++;
@@ -734,14 +671,12 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							if ((numWritten = fprintf(dump, "%zu", maxInd)) < 0) {
 								free(buffer);
 								free(scratch);
-								free(probsStarts);
 								return -1;
 							}
 							*startPoint += numWritten;
 							if (fwrite("\"", sizeof(char), 1, dump) != 1) {
 								free(buffer);
 								free(scratch);
-								free(probsStarts);
 								return -1;
 							}
 							(*startPoint)++;
@@ -753,7 +688,6 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 	}
 	free(buffer);
 	free(scratch);
-	free(probsStarts);
 	return 0;
 }
 struct node *getVocab(FILE *vocabFile) {
