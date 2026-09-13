@@ -52,7 +52,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 		struct codepoint curPoint = wrappedString[i - 1];
 		char codeIndex = strlen(curPoint.content) - 1;
 		size_t traveled = 1;
-		while (i >= traveled && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+		while (i >= traveled && maxLen >= traveled && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
 			if (!codeIndex) {
 				scratch[maxLen - traveled] = lastVocab[(unsigned char)curPoint.content[codeIndex]]->leaf;
 				if (traveled == 1 && scratch[maxLen - traveled]) {
@@ -420,7 +420,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 		struct codepoint curPoint = wrappedString[i];
 		char codeIndex = 0;
 		size_t traveled = 0;
-		while (i + traveled < numCodepoints && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+		while (i + traveled < numCodepoints && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
 			if (codeIndex == strlen(curPoint.content) - 1) {
 				scratch[traveled] = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL;
 				if (!traveled && scratch[traveled]) {
@@ -542,7 +542,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 						char codeIndex = 0;
 						size_t traveled = 0;
 						size_t startTravel;
-						while (vPos + traveled < numCodepoints - 1 && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL && random >= 0) {
+						while (vPos + traveled < numCodepoints - 1 && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL && random >= 0) {
 							if (codeIndex == strlen(curPoint.content) - 1) {
 								if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
 									random -= pow(2, wrappedString[vPos + traveled + 1].logTokenizations - wrappedString[vPos].logTokenizations);
@@ -598,7 +598,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 							lastVocab = vocab;
 							curPoint = wrappedString[vPos + traveled];
 							codeIndex = 0;
-							while (vPos + traveled < numCodepoints && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+							while (vPos + traveled < numCodepoints && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
 								if (codeIndex == strlen(curPoint.content) - 1) {
 									if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
 										if (vPos + traveled + 1 < numCodepoints) {
