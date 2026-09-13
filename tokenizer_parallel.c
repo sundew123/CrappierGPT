@@ -12,10 +12,12 @@ struct codepoint {
 	char content[5];
 };
 struct node {
-	char* vocab;
-	struct node* next;
+	struct node* next[256];
+	struct node* backtrack;
+	size_t vocab;
+	char leaf;
 };
-long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, struct codepoint *wrappedString, size_t numCodepoints, struct node **vocab, size_t context, double scaling, long int *startPoint) {
+long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocabs, size_t maxLen, struct codepoint *wrappedString, size_t numCodepoints, struct node **vocab, size_t context, double scaling, long int *startPoint) {
 	double *buffer = malloc(maxLen * (context - 1) * sizeof(double));
 	if (buffer == NULL) {
 		return -1;
@@ -46,68 +48,122 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 	for (size_t i = 1; i < numCodepoints; i++) {
 		queueStart = (i <= maxLen) ? 0 : ((queueStart + 1) % maxLen);
 		char atomicExists = 0;
-		struct node *lastVocab = NULL;
-		for (struct node *j = *vocab; j != NULL; j = j->next) {
-			lastVocab = j;
-			size_t backDist = strlen(j->vocab);
-			size_t step = 1;
-			char match = 1;
-			while (match && i >= step && backDist >= strlen(wrappedString[i - step].content)) {
-				char temp = j->vocab[backDist];
-				j->vocab[backDist] = '\0';
-				if (strcmp(j->vocab + backDist - strlen(wrappedString[i - step].content), wrappedString[i - step].content)) {
-					match = 0;
-				}
-				j->vocab[backDist] = temp;
-				backDist -= strlen(wrappedString[i - step].content);
-				step++;
-			}
-			if (backDist) {
-				match = 0;
-			}
-			if (match) {
-				scratch[maxLen + 1 - step] = 1;
-				if (step == 2) {
+		struct node **lastVocab = vocab;
+		struct codepoint curPoint = wrappedString[i - 1];
+		char codeIndex = strlen(curPoint.content) - 1;
+		size_t traveled = 1;
+		while (i >= traveled && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+			if (!codeIndex) {
+				scratch[maxLen - traveled] = lastVocab[(unsigned char)curPoint.content[codeIndex]]->leaf;
+				if (traveled == 1 && scratch[maxLen - traveled]) {
 					atomicExists = 1;
 				}
+				traveled++;
+				if (i >= traveled) {
+					lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+					curPoint = wrappedString[i - traveled];
+					codeIndex = strlen(curPoint.content) - 1;
+				}
+			} else {
+				if (i >= traveled) {
+					lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+				}
+				codeIndex--;
 			}
 		}
 		if (!atomicExists) {
-			struct node *temp = malloc(sizeof(struct node));
-			if (temp == NULL) {
+			struct node **vocabs = vocab;
+			struct node *curNode = NULL;
+			for (char j = strlen(wrappedString[i - 1].content); j > 0; j--) {
+				if (curNode == NULL) {
+					if (vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]] == NULL) {
+						vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]] = malloc(sizeof(struct node));
+						if (vocabs[wrappedString[i - 1].content[j - 1]] == NULL) {
+							free(buffer);
+							free(scratch);
+							free(checksum);
+							return -1;
+						}
+						vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]]->leaf = 0;
+						vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]]->backtrack = NULL;
+						for (int k = 0; k < 256; k++) {
+							vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]]->next[k] = NULL;
+						}
+					}
+					curNode = vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]];
+				} else {
+					if (curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]] == NULL) {
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]] = malloc(sizeof(struct node));
+						if (curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]] == NULL) {
+							free(buffer);
+							free(scratch);
+							free(checksum);
+							return -1;
+						}
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]]->leaf = 0;
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]]->backtrack = curNode;
+						for (int k = 0; k < 256; k++) {
+							curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]]->next[k] = NULL;
+						}
+					}
+					curNode = curNode->next[(unsigned char)wrappedString[i - 1].content[j - 1]];
+				}
+			}
+			curNode->leaf = 1;
+			curNode->vocab = *numVocabs;
+			vocabs = vocab;
+			curNode = NULL;
+			for (char j = 0; j < strlen(wrappedString[i - 1].content) + 1; j++) {
+				if (curNode == NULL) {
+					if (vocabs[(unsigned char)wrappedString[i - 1].content[j]] == NULL) {
+						vocabs[(unsigned char)wrappedString[i - 1].content[j]] = malloc(sizeof(struct node));
+						if (vocabs[wrappedString[i - 1].content[j]] == NULL) {
+							free(buffer);
+							free(scratch);
+							free(checksum);
+							return -1;
+						}
+						vocabs[(unsigned char)wrappedString[i - 1].content[j]]->leaf = 0;
+						vocabs[(unsigned char)wrappedString[i - 1].content[j]]->backtrack = NULL;
+						for (int k = 0; k < 256; k++) {
+							vocabs[(unsigned char)wrappedString[i - 1].content[j]]->next[k] = NULL;
+						}
+					}
+					curNode = vocabs[(unsigned char)wrappedString[i - 1].content[j]];
+				} else {
+					if (curNode->next[(unsigned char)wrappedString[i - 1].content[j]] == NULL) {
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j]] = malloc(sizeof(struct node));
+						if (curNode->next[(unsigned char)wrappedString[i - 1].content[j]] == NULL) {
+							free(buffer);
+							free(scratch);
+							free(checksum);
+							return -1;
+						}
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j]]->leaf = 0;
+						curNode->next[(unsigned char)wrappedString[i - 1].content[j]]->backtrack = curNode;
+						for (int k = 0; k < 256; k++) {
+							curNode->next[(unsigned char)wrappedString[i - 1].content[j]]->next[k] = NULL;
+						}
+					}
+					curNode = curNode->next[(unsigned char)wrappedString[i - 1].content[j]];
+				}
+			}
+			curNode->leaf = 1;
+			curNode->vocab = *numVocabs;
+			(*numVocabs)++;
+			long int newVocPos = ftell(vocabFile);
+			if (newVocPos < 0) {
 				free(buffer);
-				free(checksum);
 				free(scratch);
+				free(checksum);
 				return -1;
 			}
-			temp->vocab = malloc((strlen(wrappedString[i - 1].content) + 1) * sizeof(char));
-			if (temp->vocab == NULL) {
-				free(buffer);
-				free(checksum);
-				free(scratch);
-				free(temp);
-				return -1;
-			}
-			strcpy(temp->vocab, wrappedString[i - 1].content);
-			temp->next = NULL;
-			if (lastVocab == NULL) {
-				*vocab = temp;
-			} else {
-				lastVocab->next = temp;
-				long int newVocPos = ftell(vocabFile);
-				if (newVocPos < 0) {
+			if (newVocPos != 0) {
+				if (fwrite(",", sizeof(char), 1, vocabFile) != 1) {
 					free(buffer);
 					free(scratch);
 					free(checksum);
 					return -1;
-				}
-				if (newVocPos != 0) {
-					if (fwrite(",", sizeof(char), 1, vocabFile) != 1) {
-						free(buffer);
-						free(scratch);
-						free(checksum);
-						return -1;
-					}
 				}
 			}
 			if (!strcmp(wrappedString[i - 1].content, "\"")) {
@@ -217,50 +273,105 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 			scratch[j] = 0;
 		}
 	}
-	struct node *lastVocab = NULL;
+	struct node **lastVocab = vocab;
 	char atomicExists = 0;
-	for (struct node *i = *vocab; i != NULL; i = i->next) {
-		lastVocab = i;
-		if (!strcmp(wrappedString[numCodepoints - 1].content, i->vocab)) {
-			atomicExists = 1;
-		}
+	for (char i = 0; wrappedString[numCodepoints - 1].content[i] != '\0' && lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]] != NULL; i++) {
+		atomicExists = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]]->next[0] != NULL;
+		lastVocab = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]]->next;
 	}
 	if (!atomicExists) {
-		struct node *temp = malloc(sizeof(struct node));
-		if (temp == NULL) {
+		struct node **vocabs = vocab;
+		struct node *curNode = NULL;
+		for (char j = strlen(wrappedString[numCodepoints - 1].content); j > 0; j--) {
+			if (curNode == NULL) {
+				if (vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] == NULL) {
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] = malloc(sizeof(struct node));
+					if (vocabs[wrappedString[(unsigned char)numCodepoints - 1].content[j - 1]] == NULL) {
+						free(buffer);
+						free(scratch);
+						free(checksum);
+						return -1;
+					}
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->leaf = 0;
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->backtrack = NULL;
+					for (int k = 0; k < 256; k++) {
+						vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->next[k] = NULL;
+					}
+				}
+				curNode = vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]];
+			} else {
+				if (curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] == NULL) {
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] = malloc(sizeof(struct node));
+					if (curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] == NULL) {
+						free(buffer);
+						free(scratch);
+						free(checksum);
+						return -1;
+					}
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->leaf = 0;
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->backtrack = curNode;
+					for (int k = 0; k < 256; k++) {
+						curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]]->next[k] = NULL;
+					}
+				}
+				curNode = curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]];
+			}
+		}
+		curNode->leaf = 1;
+		curNode->vocab = *numVocabs;
+		vocabs = vocab;
+		curNode = NULL;
+		for (char j = 0; j < strlen(wrappedString[numCodepoints - 1].content) + 1; j++) {
+			if (curNode == NULL) {
+				if (vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]] == NULL) {
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]] = malloc(sizeof(struct node));
+					if (vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]] == NULL) {
+						free(buffer);
+						free(scratch);
+						free(checksum);
+						return -1;
+					}
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->leaf = 0;
+					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->backtrack = NULL;
+					for (int k = 0; k < 256; k++) {
+						vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->next[k] = NULL;
+					}
+				}
+				curNode = vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j]];
+			} else {
+				if (curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]] == NULL) {
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]] = malloc(sizeof(struct node));
+					if (curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]] == NULL) {
+						free(buffer);
+						free(scratch);
+						free(checksum);
+						return -1;
+					}
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->leaf = 0;
+					curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->backtrack = curNode;
+					for (int k = 0; k < 256; k++) {
+						curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]]->next[k] = NULL;
+					}
+				}
+				curNode = curNode->next[(unsigned char)wrappedString[numCodepoints - 1].content[j]];
+			}
+		}
+		curNode->leaf = 1;
+		curNode->vocab = *numVocabs;
+		(*numVocabs)++;
+		long int newVocPos = ftell(vocabFile);
+		if (newVocPos < 0) {
 			free(buffer);
-			free(checksum);
 			free(scratch);
+			free(checksum);
 			return -1;
 		}
-		temp->vocab = malloc((strlen(wrappedString[numCodepoints - 1].content) + 1) * sizeof(char));
-		if (temp->vocab == NULL) {
-			free(buffer);
-			free(checksum);
-			free(scratch);
-			free(temp);
-			return -1;
-		}
-		strcpy(temp->vocab, wrappedString[numCodepoints - 1].content);
-		temp->next = NULL;
-		if (lastVocab == NULL) {
-			*vocab = temp;
-		} else {
-			lastVocab->next = temp;
-			long int newVocPos = ftell(vocabFile);
-			if (newVocPos < 0) {
+		if (newVocPos != 0) {
+			if (fwrite(",", sizeof(char), 1, vocabFile) != 1) {
 				free(buffer);
 				free(scratch);
 				free(checksum);
 				return -1;
-			}
-			if (newVocPos != 0) {
-				if (fwrite(",", sizeof(char), 1, vocabFile) != 1) {
-					free(buffer);
-					free(scratch);
-					free(checksum);
-					return -1;
-				}
 			}
 		}
 		if (!strcmp(wrappedString[numCodepoints - 1].content, "\"")) {
@@ -305,24 +416,27 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 	}
 	for (size_t i = numCodepoints; i > 0; i--) {
 		i--;
-		for (struct node *j = *vocab; j != NULL; j = j->next) {
-			size_t compDist = 0;
-			char match = 1;
-			size_t k = i;
-			for (; k < numCodepoints && compDist + strlen(wrappedString[k].content) <= strlen(j->vocab) && match; k++) {
-				char temp = j->vocab[compDist + strlen(wrappedString[k].content)];
-				j->vocab[compDist + strlen(wrappedString[k].content)] = '\0';
-				if (strcmp(j->vocab + compDist, wrappedString[k].content)) {
-					match = 0;
+		lastVocab = vocab;
+		struct codepoint curPoint = wrappedString[i];
+		char codeIndex = 0;
+		size_t traveled = 0;
+		while (i + traveled < numCodepoints && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+			if (codeIndex == strlen(curPoint.content) - 1) {
+				scratch[traveled] = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL;
+				if (!traveled && scratch[traveled]) {
+					atomicExists = 1;
 				}
-				j->vocab[compDist + strlen(wrappedString[k].content)] = temp;
-				compDist += strlen(wrappedString[k].content);
-			}
-			if (compDist != strlen(j->vocab)) {
-				match = 0;
-			}
-			if (match) {
-				scratch[k - i - 1] = 1;
+				traveled++;
+				if (i + traveled < numCodepoints) {
+					lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+					curPoint = wrappedString[i + traveled];
+				}
+				codeIndex = 0;
+			} else {
+				if (i + traveled < numCodepoints) {
+					lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+				}
+				codeIndex++;
 			}
 		}
 		size_t minLength = numCodepoints;
@@ -423,41 +537,28 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
 						double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
 						size_t ind = 0;
-						size_t lastValid;
-						size_t lastInd;
-						for (struct node *l = *vocab; random >= 0 && l != NULL; l = l->next) {
-							size_t compDist = 0;
-							char match = 1;
-							size_t m = vPos;
-							for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
-								char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
-								l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
-								if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
-									match = 0;
+						lastVocab = vocab;
+						struct codepoint curPoint = wrappedString[vPos];
+						char codeIndex = 0;
+						size_t traveled = 0;
+						size_t startTravel;
+						while (vPos + traveled < numCodepoints - 1 && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL && random >= 0) {
+							if (codeIndex == strlen(curPoint.content) - 1) {
+								if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
+									random -= pow(2, wrappedString[vPos + traveled + 1].logTokenizations - wrappedString[vPos].logTokenizations);
+									ind = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
 								}
-								l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
-								compDist += strlen(wrappedString[m].content);
-							}
-							if (compDist != strlen(l->vocab)) {
-								match = 0;
-							}
-							if (match) {
-								if (m == numCodepoints) {
-									random -= pow(2, -wrappedString[vPos].logTokenizations);
-								} else {
-									random -= pow(2, wrappedString[m].logTokenizations - wrappedString[vPos].logTokenizations);
-								}
-								lastValid = m;
-								lastInd = ind;
-							}
-							if (random >= 0 && l->next != NULL) {
-								ind++;
+								lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+								traveled++;
+								curPoint = wrappedString[vPos + traveled];
+								codeIndex = 0;
 							} else {
-								vPos = lastValid;
+								lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+								codeIndex++;
 							}
 						}
-						ind = lastInd;
-						if (vPos < numCodepoints) {
+						startTravel = traveled;
+						if (random < 0) {
 							if (!k && *startPoint > 0) {
 								if (fwrite("\n", sizeof(char), 1, dump) != 1) {
 									free(buffer);
@@ -494,40 +595,36 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							}
 							(*startPoint)++;
 							size_t maxVocab = 0;
-							ind = 0;
-							size_t maxInd = 0;
-							for (struct node *l = *vocab; l != NULL; l = l->next) {
-								size_t compDist = 0;
-								char match = 1;
-								size_t m = vPos;
-								for (; m < numCodepoints && compDist + strlen(wrappedString[m].content) <= strlen(l->vocab) && match; m++) {
-									char temp = l->vocab[compDist + strlen(wrappedString[m].content)];
-									l->vocab[compDist + strlen(wrappedString[m].content)] = '\0';
-									if (strcmp(l->vocab + compDist, wrappedString[m].content)) {
-										match = 0;
-									}
-									l->vocab[compDist + strlen(wrappedString[m].content)] = temp;
-									compDist += strlen(wrappedString[m].content);
-								}
-								if (compDist != strlen(l->vocab)) {
-									match = 0;
-								}
-								if (match) {
-									if (m == numCodepoints) {
-										if (wrappedString[vPos].numTokens == 1 && strlen(l->vocab) > maxVocab) {
-											maxVocab = strlen(l->vocab);
-											maxInd = ind;
-										}
-									} else {
-										if (wrappedString[vPos].numTokens == wrappedString[m].numTokens + 1 && strlen(l->vocab) > maxVocab) {
-											maxVocab = strlen(l->vocab);
-											maxInd = ind;
+							lastVocab = vocab;
+							curPoint = wrappedString[vPos + traveled];
+							codeIndex = 0;
+							while (vPos + traveled < numCodepoints && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+								if (codeIndex == strlen(curPoint.content) - 1) {
+									if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
+										if (vPos + traveled + 1 < numCodepoints) {
+											if (wrappedString[vPos + startTravel].numTokens == wrappedString[vPos + traveled + 1].numTokens + 1) {
+												maxVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
+											}
+										} else {
+											if (wrappedString[vPos + startTravel].numTokens == 1) {
+												maxVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
+											}
 										}
 									}
+									traveled++;
+									if (vPos + traveled < numCodepoints) {
+										lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+										curPoint = wrappedString[vPos + traveled];
+									}
+									codeIndex = 0;
+								} else {
+									if (vPos + traveled < numCodepoints) {
+										lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
+									}
+									codeIndex++;
 								}
-								ind++;
 							}
-							if ((numWritten = fprintf(dump, "%zu", maxInd)) < 0) {
+							if ((numWritten = fprintf(dump, "%zu", maxVocab)) < 0) {
 								free(buffer);
 								free(scratch);
 								return -1;
@@ -540,6 +637,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 							}
 							(*startPoint)++;
 						}
+						vPos += startTravel;
 					}
 				}
 				sumExpVal += pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
@@ -550,41 +648,58 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t maxLen, s
 	free(scratch);
 	return 0;
 }
-struct node *getVocab(FILE *vocabFile) {
-	struct node *firstVocab = malloc(sizeof(struct node));
-	if (firstVocab == NULL) {
-		return NULL;
+size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
+	for (int i = 0; i < 256; i++) {
+		vocabs[i] = NULL;
 	}
-	firstVocab->next = NULL;
-	struct node *curVocab;
+	struct node *curNode = NULL;
 	char escaped = 1;
 	char start = 0;
 	char quoted = 0;
-	char mode = 0;
 	char first = 0;
 	long int dist = 0;
+	long int maxDist = 0;
 	long int vocLen = 0;
 	char fileStart = 1;
+	char bufDist = 0;
+	char bufPoint = 0;
+	size_t utfVal = 0;
+	size_t vocCount = 0;
 	while (!feof(vocabFile)) {
 		int ch = getc(vocabFile);
 		if (ch == EOF && !feof(vocabFile)) {
-			for (struct node *i = firstVocab->next; i != NULL;) {
-				free(i->vocab);
-				struct node *j = i->next;
-				free(i);
-				i = j;
+			struct node **curBufs = vocabs;
+			struct node *backtrack = NULL;
+			int i = 0;
+			while (i < 256) {
+				if (curBufs[i] != NULL) {
+					backtrack = curBufs[i]->backtrack;
+					curBufs = curBufs[i]->next;
+					i = -1;
+				}
+				i++;
+				if (i == 256 && curBufs != vocabs) {
+					if (backtrack == NULL) {
+						for (i = 0; vocabs[i]->next != curBufs; i++) {}
+						free(vocabs[i]);
+						vocabs[i] = NULL;
+						curBufs = vocabs;
+					} else {
+						for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+						free(backtrack->next[i]);
+						backtrack->next[i] = NULL;
+						curBufs = backtrack->next;
+						backtrack = backtrack->backtrack;
+					}
+				}
 			}
-			free(firstVocab);
-			return NULL;
+			return -1;
 		}
 		if (fileStart && !feof(vocabFile) && ch == '"') {
 			start = 1;
 			fileStart = 0;
 		} else if (fileStart && !feof(vocabFile)) {
 			fileStart = 0;
-		}
-		if (!feof(vocabFile) && !mode) {
-			dist--;
 		}
 		if (start) {
 			start = 0;
@@ -595,106 +710,519 @@ struct node *getVocab(FILE *vocabFile) {
 			}
 		}
 		if ((feof(vocabFile) && !fileStart) || ((ch == ',' || ch == '\n') && escaped)) {
-			if (mode) {
-				mode = 0;
-			} else {
-				if (fseek(vocabFile, dist, SEEK_CUR)) {
-					for (struct node *i = firstVocab->next; i != NULL;) {
-						free(i->vocab);
-						struct node *j = i->next;
-						free(i);
-						i = j;
-					}
-					free(firstVocab);
-					return NULL;
-				}
-				dist = 0;
-				mode = 1;
-				struct node *nextVocab = malloc(sizeof(struct node));
-				if (nextVocab == NULL) {
-					for (struct node *i = firstVocab->next; i != NULL;) {
-						free(i->vocab);
-						struct node *j = i->next;
-						free(i);
-						i = j;
-					}
-					free(firstVocab);
-					return NULL;
-				}
-				nextVocab->vocab = malloc((vocLen + 1) * sizeof(char));
-				if (nextVocab->vocab == NULL) {
-					for (struct node *i = firstVocab->next; i != NULL;) {
-						free(i->vocab);
-						struct node *j = i->next;
-						free(i);
-						i = j;
-					}
-					free(firstVocab);
-					free(nextVocab);
-					return NULL;
-				}
-				nextVocab->vocab[vocLen] = '\0';
-				nextVocab->next = NULL;
-				if (firstVocab->next == NULL) {
-					firstVocab->next = nextVocab;
-				} else {
-					curVocab->next = nextVocab;
-				}
-				curVocab = nextVocab;
+			if (bufDist > 0 && bufPoint == bufDist && utfVal > 127 && utfVal < 1114112 && (((utfVal >> 7) && bufDist == 2) || ((utfVal >> 11) && bufDist == 3) || ((utfVal >> 16) && bufDist == 4))) {
+				dist++;
+			} else if (bufDist) {
+				dist += bufPoint;
 			}
+			bufDist = 0;
+			bufPoint = 0;
+			utfVal = 0;
+			if (dist > maxDist) {
+				maxDist = dist;
+			}
+			curNode->next[0] = malloc(sizeof(struct node));
+			if (curNode->next[0] == NULL) {
+				struct node **curBufs = vocabs;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocabs) {
+						if (backtrack == NULL) {
+							for (i = 0; vocabs[i]->next != curBufs; i++) {}
+							free(vocabs[i]);
+							vocabs[i] = NULL;
+							curBufs = vocabs;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
+				}
+				return -1;
+			}
+			curNode->next[0]->leaf = 0;
+			curNode->next[0]->backtrack = curNode;
+			for (int i = 0; i < 256; i++) {
+				curNode->next[0]->next[i] = NULL;
+			}
+			curNode->next[0]->vocab = vocCount;
+			struct node *nextNode = NULL;
+			while (curNode != NULL) {
+				int bCr = 0;
+				if (curNode->backtrack != NULL) {
+					for (; curNode->backtrack->next[bCr] != curNode; bCr++) {}
+				} else {
+					for (; vocabs[bCr] != curNode; bCr++) {}
+				}
+				if (nextNode == NULL) {
+					if (vocabs[bCr] == NULL) {
+						vocabs[bCr] = malloc(sizeof(struct node));
+						if (vocabs[bCr] == NULL) {
+							struct node **curBufs = vocabs;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocabs) {
+									if (backtrack == NULL) {
+										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										free(vocabs[i]);
+										vocabs[i] = NULL;
+										curBufs = vocabs;
+									} else {
+										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
+							}
+							return -1;
+						}
+						vocabs[bCr]->leaf = 0;
+						vocabs[bCr]->backtrack = NULL;
+						for (int i = 0; i < 256; i++) {
+							vocabs[bCr]->next[i] = NULL;
+						}
+					}
+					nextNode = vocabs[bCr];
+				} else {
+					if (nextNode->next[bCr] == NULL) {
+						nextNode->next[bCr] = malloc(sizeof(struct node));
+						if (nextNode->next[bCr] == NULL) {
+							struct node **curBufs = vocabs;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocabs) {
+									if (backtrack == NULL) {
+										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										free(vocabs[i]);
+										vocabs[i] = NULL;
+										curBufs = vocabs;
+									} else {
+										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
+							}
+							return -1;
+						}
+						nextNode->next[bCr]->leaf = 0;
+						nextNode->next[bCr]->backtrack = nextNode;
+						for (int i = 0; i < 256; i++) {
+							nextNode->next[bCr]->next[i] = NULL;
+						}
+					}
+					nextNode = nextNode->next[bCr];
+				}
+				curNode = curNode->backtrack;
+			}
+			curNode = NULL;
+			nextNode->leaf = 1;
+			nextNode->vocab = vocCount;
+			dist = 0;
 			start = 1;
 			quoted = 0;
 			vocLen = 0;
+			vocCount++;
+			*numVocabs = vocCount;
 		} else if (!feof(vocabFile)) {
 			if (first) {
 				first = 0;
 			} else if (quoted) {
 				if (escaped) {
 					if (ch == '"') {
+						if (bufDist > 0 && bufPoint < bufDist) {
+							dist += bufPoint;
+							bufDist = 0;
+							bufPoint = 0;
+							utfVal = 0;
+						}
+						dist++;
 						escaped = 0;
-						if (mode) {
-							curVocab->vocab[vocLen] = ch;
+						if (curNode == NULL) {
+							if (vocabs[ch] == NULL) {
+								vocabs[ch] = malloc(sizeof(struct node));
+								if (vocabs[ch] == NULL) {
+									struct node **curBufs = vocabs;
+									struct node *backtrack = NULL;
+									int i = 0;
+									while (i < 256) {
+										if (curBufs[i] != NULL) {
+											backtrack = curBufs[i]->backtrack;
+											curBufs = curBufs[i]->next;
+											i = -1;
+										}
+										i++;
+										if (i == 256 && curBufs != vocabs) {
+											if (backtrack == NULL) {
+												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												free(vocabs[i]);
+												vocabs[i] = NULL;
+												curBufs = vocabs;
+											} else {
+												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												free(backtrack->next[i]);
+												backtrack->next[i] = NULL;
+												curBufs = backtrack->next;
+												backtrack = backtrack->backtrack;
+											}
+										}
+									}
+									return -1;
+								}
+								vocabs[ch]->leaf = 0;
+								vocabs[ch]->backtrack = NULL;
+								for (int i = 0; i < 256; i++) {
+									vocabs[ch]->next[i] = NULL;
+								}
+							}
+							curNode = vocabs[ch];
+						} else {
+							if (curNode->next[ch] == NULL) {
+								curNode->next[ch] = malloc(sizeof(struct node));
+								if (curNode->next[ch] == NULL) {
+									struct node **curBufs = vocabs;
+									struct node *backtrack = NULL;
+									int i = 0;
+									while (i < 256) {
+										if (curBufs[i] != NULL) {
+											backtrack = curBufs[i]->backtrack;
+											curBufs = curBufs[i]->next;
+											i = -1;
+										}
+										i++;
+										if (i == 256 && curBufs != vocabs) {
+											if (backtrack == NULL) {
+												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												free(vocabs[i]);
+												vocabs[i] = NULL;
+												curBufs = vocabs;
+											} else {
+												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												free(backtrack->next[i]);
+												backtrack->next[i] = NULL;
+												curBufs = backtrack->next;
+												backtrack = backtrack->backtrack;
+											}
+										}
+									}
+									return -1;
+								}
+								curNode->next[ch]->leaf = 0;
+								curNode->next[ch]->backtrack = curNode;
+								for (int i = 0; i < 256; i++) {
+									curNode->next[ch]->next[i] = NULL;
+								}
+							}
+							curNode = curNode->next[ch];
 						}
 						vocLen++;
 					} else {
-						for (struct node *i = firstVocab->next; i != NULL;) {
-							free(i->vocab);
-							struct node *j = i->next;
-							free(i);
-							i = j;
+						struct node **curBufs = vocabs;
+						struct node *backtrack = NULL;
+						int i = 0;
+						while (i < 256) {
+							if (curBufs[i] != NULL) {
+								backtrack = curBufs[i]->backtrack;
+								curBufs = curBufs[i]->next;
+								i = -1;
+							}
+							i++;
+							if (i == 256 && curBufs != vocabs) {
+								if (backtrack == NULL) {
+									for (i = 0; vocabs[i]->next != curBufs; i++) {}
+									free(vocabs[i]);
+									vocabs[i] = NULL;
+									curBufs = vocabs;
+								} else {
+									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									free(backtrack->next[i]);
+									backtrack->next[i] = NULL;
+									curBufs = backtrack->next;
+									backtrack = backtrack->backtrack;
+								}
+							}
 						}
-						free(firstVocab);
-						return NULL;
+						return -1;
 					}
 				} else {
 					if (ch == '"') {
 						escaped = 1;
 					} else {
-						if (mode) {
-							curVocab->vocab[vocLen] = ch;
+						if (bufPoint < bufDist && (ch & 192) == 128) {
+							utfVal = (utfVal << 6) + (ch & 63);
+							bufPoint++;
+						} else {
+							if (bufDist > 0 && bufPoint == bufDist && utfVal > 127 && utfVal < 1114112 && (((utfVal >> 7) && bufDist == 2) || ((utfVal >> 11) && bufDist == 3) || ((utfVal >> 16) && bufDist == 4))) {
+								dist++;
+							} else if (bufDist) {
+								dist += bufPoint;
+							}
+							bufDist = 0;
+							bufPoint = 0;
+							utfVal = 0;
+							if ((ch & 224) == 192) {
+								bufDist = 2;
+								bufPoint = 1;
+								utfVal = ch & ((1 << (7 - bufDist)) - 1);
+							} else if ((ch & 240) == 224) {
+								bufDist = 3;
+								bufPoint = 1;
+								utfVal = ch & ((1 << (7 - bufDist)) - 1);
+	 						} else if ((ch & 248) == 240) {
+								bufDist = 4;
+								bufPoint = 1;
+								utfVal = ch & ((1 << (7 - bufDist)) - 1);
+							} else {
+								dist++;
+							}
+						}
+						if (curNode == NULL) {
+							if (vocabs[ch] == NULL) {
+								vocabs[ch] = malloc(sizeof(struct node));
+								if (vocabs[ch] == NULL) {
+									struct node **curBufs = vocabs;
+									struct node *backtrack = NULL;
+									int i = 0;
+									while (i < 256) {
+										if (curBufs[i] != NULL) {
+											backtrack = curBufs[i]->backtrack;
+											curBufs = curBufs[i]->next;
+											i = -1;
+										}
+										i++;
+										if (i == 256 && curBufs != vocabs) {
+											if (backtrack == NULL) {
+												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												free(vocabs[i]);
+												vocabs[i] = NULL;
+												curBufs = vocabs;
+											} else {
+												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												free(backtrack->next[i]);
+												backtrack->next[i] = NULL;
+												curBufs = backtrack->next;
+												backtrack = backtrack->backtrack;
+											}
+										}
+									}
+									return -1;
+								}
+								vocabs[ch]->leaf = 0;
+								vocabs[ch]->backtrack = NULL;
+								for (int i = 0; i < 256; i++) {
+									vocabs[ch]->next[i] = NULL;
+								}
+							}
+							curNode = vocabs[ch];
+						} else {
+							if (curNode->next[ch] == NULL) {
+								curNode->next[ch] = malloc(sizeof(struct node));
+								if (curNode->next[ch] == NULL) {
+									struct node **curBufs = vocabs;
+									struct node *backtrack = NULL;
+									int i = 0;
+									while (i < 256) {
+										if (curBufs[i] != NULL) {
+											backtrack = curBufs[i]->backtrack;
+											curBufs = curBufs[i]->next;
+											i = -1;
+										}
+										i++;
+										if (i == 256 && curBufs != vocabs) {
+											if (backtrack == NULL) {
+												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												free(vocabs[i]);
+												vocabs[i] = NULL;
+												curBufs = vocabs;
+											} else {
+												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												free(backtrack->next[i]);
+												backtrack->next[i] = NULL;
+												curBufs = backtrack->next;
+												backtrack = backtrack->backtrack;
+											}
+										}
+									}
+									return -1;
+								}
+								curNode->next[ch]->leaf = 0;
+								curNode->next[ch]->backtrack = curNode;
+								for (int i = 0; i < 256; i++) {
+									curNode->next[ch]->next[i] = NULL;
+								}
+							}
+							curNode = curNode->next[ch];
 						}
 						vocLen++;
 					}
 				}
 			} else {
 				if (ch == '"') {
-					for (struct node *i = firstVocab->next; i != NULL;) {
-						free(i->vocab);
-						struct node *j = i->next;
-						free(i);
-						i = j;
+					struct node **curBufs = vocabs;
+					struct node *backtrack = NULL;
+					int i = 0;
+					while (i < 256) {
+						if (curBufs[i] != NULL) {
+							backtrack = curBufs[i]->backtrack;
+							curBufs = curBufs[i]->next;
+							i = -1;
+						}
+						i++;
+						if (i == 256 && curBufs != vocabs) {
+							if (backtrack == NULL) {
+								for (i = 0; vocabs[i]->next != curBufs; i++) {}
+								free(vocabs[i]);
+								vocabs[i] = NULL;
+								curBufs = vocabs;
+							} else {
+								for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+								free(backtrack->next[i]);
+								backtrack->next[i] = NULL;
+								curBufs = backtrack->next;
+								backtrack = backtrack->backtrack;
+							}
+						}
 					}
-					free(firstVocab);
-					return NULL;
+					return -1;
 				}
-				if (mode) {
-					curVocab->vocab[vocLen] = ch;
+				if (bufPoint < bufDist && (ch & 192) == 128) {
+					utfVal = (utfVal << 6) + (ch & 63);
+					bufPoint++;
+				} else {
+					if (bufDist > 0 && bufPoint == bufDist && utfVal > 127 && utfVal < 1114112 && (((utfVal >> 7) && bufDist == 2) || ((utfVal >> 11) && bufDist == 3) || ((utfVal >> 16) && bufDist == 4))) {
+						dist++;
+					} else if (bufDist) {
+						dist += bufPoint;
+					}
+					bufDist = 0;
+					bufPoint = 0;
+					utfVal = 0;
+					if ((ch & 224) == 192) {
+						bufDist = 2;
+						bufPoint = 1;
+						utfVal = ch & ((1 << (7 - bufDist)) - 1);
+					} else if ((ch & 240) == 224) {
+						bufDist = 3;
+						bufPoint = 1;
+						utfVal = ch & ((1 << (7 - bufDist)) - 1);
+	 				} else if ((ch & 248) == 240) {
+						bufDist = 4;
+						bufPoint = 1;
+						utfVal = ch & ((1 << (7 - bufDist)) - 1);
+					} else {
+						dist++;
+					}
+				}
+				if (curNode == NULL) {
+					if (vocabs[ch] == NULL) {
+						vocabs[ch] = malloc(sizeof(struct node));
+						if (vocabs[ch] == NULL) {
+							struct node **curBufs = vocabs;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocabs) {
+									if (backtrack == NULL) {
+										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										free(vocabs[i]);
+										vocabs[i] = NULL;
+										curBufs = vocabs;
+									} else {
+										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
+							}
+							return -1;
+						}
+						vocabs[ch]->leaf = 0;
+						vocabs[ch]->backtrack = NULL;
+						for (int i = 0; i < 256; i++) {
+							vocabs[ch]->next[i] = NULL;
+						}
+					}
+					curNode = vocabs[ch];
+				} else {
+					if (curNode->next[ch] == NULL) {
+						curNode->next[ch] = malloc(sizeof(struct node));
+						if (curNode->next[ch] == NULL) {
+							struct node **curBufs = vocabs;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocabs) {
+									if (backtrack == NULL) {
+										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										free(vocabs[i]);
+										vocabs[i] = NULL;
+										curBufs = vocabs;
+									} else {
+										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
+							}
+							return -1;
+						}
+						curNode->next[ch]->leaf = 0;
+						curNode->next[ch]->backtrack = curNode;
+						for (int i = 0; i < 256; i++) {
+							curNode->next[ch]->next[i] = NULL;
+						}
+					}
+					curNode = curNode->next[ch];
 				}
 				vocLen++;
 			}
 		}
 	}
-	return firstVocab;
+	return maxDist;
 }
 int main(int argc, char *argv[]) {
 	(void)argc;
@@ -712,92 +1240,81 @@ int main(int argc, char *argv[]) {
 		fclose(dump);
 		return 1;
 	}
-	struct node *vocab = getVocab(vocabFile);
+	struct node **vocab = malloc(256 * sizeof(struct node*));
 	if (vocab == NULL) {
 		fclose(vocabFile);
 		fclose(dump);
 		return 1;
 	}
-	struct node *nextVocab = vocab->next;
-	free(vocab);
-	vocab = nextVocab;
-	size_t maxLen = 0;
-	for (struct node *i = vocab; i != NULL; i = i->next) {
-		int vocLen = 0;
-		char vocTot = 0;
-		size_t compLen = 0;
-		char vocBuf[4];
-		for (size_t j = 0; i->vocab[j] != '\0'; j++) {
-			if (vocLen < vocTot && (i->vocab[j] & 192) == 128) {
-				vocBuf[vocLen] = i->vocab[j];
-				vocLen++;
-			} else {
-				size_t utfValue = vocBuf[0] & ((1 << (7 - vocTot)) - 1);
-				if (vocTot > 0 && vocLen == vocTot) {
-					for (int k = 1; k < vocTot; k++) {
-						utfValue = (utfValue << 6) + (vocBuf[k] & 63);
-					}
-				}
-				if (vocTot > 0 && vocLen == vocTot && utfValue > 127 && utfValue < 1114112 && (((utfValue >> 7) && vocTot == 2) || ((utfValue >> 11) && vocTot == 3) || ((utfValue >> 16) && vocTot == 4))) {
-					compLen++;
-				} else if (vocTot) {
-					compLen += vocLen;
-				}
-				vocLen = 0;
-				vocTot = 0;
-				if ((i->vocab[j] & 224) == 192) {
-					vocTot = 2;
-					vocLen = 1;
-					vocBuf[0] = i->vocab[j];
-				} else if ((i->vocab[j] & 240) == 224) {
-					vocTot = 3;
-					vocLen = 1;
-					vocBuf[0] = i->vocab[j];
-	 			} else if ((i->vocab[j] & 248) == 240) {
-					vocTot = 4;
-					vocLen = 1;
-					vocBuf[0] = i->vocab[j];
-				} else {
-					compLen++;
-				}
-			}
-		}
-		size_t utfValue = vocBuf[0] & ((1 << (7 - vocTot)) - 1);
-		if (vocTot > 0 && vocLen == vocTot) {
-			for (int k = 1; k < vocTot; k++) {
-				utfValue = (utfValue << 6) + (vocBuf[k] & 63);
-			}
-		}
-		if (vocLen < vocTot || utfValue < 128 || utfValue > 1114111 || !(((utfValue >> 7) && vocTot == 2) || ((utfValue >> 11) && vocTot == 3) || ((utfValue >> 16) && vocTot == 4))) {
-			compLen += vocLen;
-		} else if (vocTot) {
-			compLen++;
-		}
-		if (compLen > maxLen) {
-			maxLen = compLen;
-		}
+	size_t numVocabs;
+	size_t maxLen = getVocab(vocabFile, vocab, &numVocabs);
+	if (maxLen == -1) {
+		fclose(vocabFile);
+		fclose(dump);
+		free(vocab);
+		return 1;
 	}
-	if (maxLen < 1) {
+	if (maxLen == 0) {
 		maxLen = 1;
 	}
 	if (fclose(vocabFile) == EOF) {
-		for (struct node *i = vocab; i != NULL;) {
-			free(i->vocab);
-			struct node *j = i->next;
-			free(i);
-			i = j;
+		struct node **curBufs = vocab;
+		struct node *backtrack = NULL;
+		int i = 0;
+		while (i < 256) {
+			if (curBufs[i] != NULL) {
+				backtrack = curBufs[i]->backtrack;
+				curBufs = curBufs[i]->next;
+				i = -1;
+			}
+			i++;
+			if (i == 256 && curBufs != vocab) {
+				if (backtrack == NULL) {
+					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					free(vocab[i]);
+					vocab[i] = NULL;
+					curBufs = vocab;
+				} else {
+					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					free(backtrack->next[i]);
+					backtrack->next[i] = NULL;
+					curBufs = backtrack->next;
+					backtrack = backtrack->backtrack;
+				}
+			}
 		}
+		free(vocab);
 		fclose(dump);
 		return 1;
 	}
 	vocabFile = fopen(argv[3], "wb+");
 	if (vocabFile == NULL) {
-		for (struct node *i = vocab; i != NULL;) {
-			free(i->vocab);
-			struct node *j = i->next;
-			free(i);
-			i = j;
+		struct node **curBufs = vocab;
+		struct node *backtrack = NULL;
+		int i = 0;
+		while (i < 256) {
+			if (curBufs[i] != NULL) {
+				backtrack = curBufs[i]->backtrack;
+				curBufs = curBufs[i]->next;
+				i = -1;
+			}
+			i++;
+			if (i == 256 && curBufs != vocab) {
+				if (backtrack == NULL) {
+					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					free(vocab[i]);
+					vocab[i] = NULL;
+					curBufs = vocab;
+				} else {
+					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					free(backtrack->next[i]);
+					backtrack->next[i] = NULL;
+					curBufs = backtrack->next;
+					backtrack = backtrack->backtrack;
+				}
+			}
 		}
+		free(vocab);
 		fclose(dump);
 		return 1;
 	}
@@ -810,12 +1327,32 @@ int main(int argc, char *argv[]) {
 	while (!feof(stdin)) {
 		int ch = getc(stdin);
 		if (ch == EOF && !feof(stdin)) {
-			for (struct node *i = vocab; i != NULL;) {
-				free(i->vocab);
-				struct node *j = i->next;
-				free(i);
-				i = j;
+			struct node **curBufs = vocab;
+			struct node *backtrack = NULL;
+			int i = 0;
+			while (i < 256) {
+				if (curBufs[i] != NULL) {
+					backtrack = curBufs[i]->backtrack;
+					curBufs = curBufs[i]->next;
+					i = -1;
+				}
+				i++;
+				if (i == 256 && curBufs != vocab) {
+					if (backtrack == NULL) {
+						for (i = 0; vocab[i]->next != curBufs; i++) {}
+						free(vocab[i]);
+						vocab[i] = NULL;
+						curBufs = vocab;
+					} else {
+						for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+						free(backtrack->next[i]);
+						backtrack->next[i] = NULL;
+						curBufs = backtrack->next;
+						backtrack = backtrack->backtrack;
+					}
+				}
 			}
+			free(vocab);
 			fclose(vocabFile);
 			fclose(dump);
 			return 1;
@@ -839,12 +1376,32 @@ int main(int argc, char *argv[]) {
 					temp.content[0] = *(buffer + i);
 					temp.content[1] = '\0';
 					if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-						for (struct node *i = vocab; i != NULL;) {
-							free(i->vocab);
-							struct node *j = i->next;
-							free(i);
-							i = j;
+						struct node **curBufs = vocab;
+						struct node *backtrack = NULL;
+						int i = 0;
+						while (i < 256) {
+							if (curBufs[i] != NULL) {
+								backtrack = curBufs[i]->backtrack;
+								curBufs = curBufs[i]->next;
+								i = -1;
+							}
+							i++;
+							if (i == 256 && curBufs != vocab) {
+								if (backtrack == NULL) {
+									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									free(vocab[i]);
+									vocab[i] = NULL;
+									curBufs = vocab;
+								} else {
+									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									free(backtrack->next[i]);
+									backtrack->next[i] = NULL;
+									curBufs = backtrack->next;
+									backtrack = backtrack->backtrack;
+								}
+							}
 						}
+						free(vocab);
 						fclose(dump);
 						fclose(vocabFile);
 						return 1;
@@ -863,12 +1420,32 @@ int main(int argc, char *argv[]) {
 				}
 				temp.content[bufLen] = '\0';
 				if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-					for (struct node *i = vocab; i != NULL;) {
-						free(i->vocab);
-						struct node *j = i->next;
-						free(i);
-						i = j;
+					struct node **curBufs = vocab;
+					struct node *backtrack = NULL;
+					int i = 0;
+					while (i < 256) {
+						if (curBufs[i] != NULL) {
+							backtrack = curBufs[i]->backtrack;
+							curBufs = curBufs[i]->next;
+							i = -1;
+						}
+						i++;
+						if (i == 256 && curBufs != vocab) {
+							if (backtrack == NULL) {
+								for (i = 0; vocab[i]->next != curBufs; i++) {}
+								free(vocab[i]);
+								vocab[i] = NULL;
+								curBufs = vocab;
+							} else {
+								for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+								free(backtrack->next[i]);
+								backtrack->next[i] = NULL;
+								curBufs = backtrack->next;
+								backtrack = backtrack->backtrack;
+							}
+						}
 					}
+					free(vocab);
 					fclose(vocabFile);
 					fclose(dump);
 					return 1;
@@ -879,60 +1456,160 @@ int main(int argc, char *argv[]) {
 			totLen = 0;
 			struct codepoint *wrappedString = malloc(numCodepoints * sizeof(struct codepoint));
 			if (wrappedString == NULL) {
-				for (struct node *i = vocab; i != NULL;) {
-					free(i->vocab);
-					struct node *j = i->next;
-					free(i);
-					i = j;
+				struct node **curBufs = vocab;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocab) {
+						if (backtrack == NULL) {
+							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							free(vocab[i]);
+							vocab[i] = NULL;
+							curBufs = vocab;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
 				}
+				free(vocab);
 				fclose(vocabFile);
 				fclose(dump);
 				return 1;
 			}
 			if (fseek(dump, -1 * numCodepoints * sizeof(struct codepoint), SEEK_CUR) < 0) {
 				free(wrappedString);
-				for (struct node *i = vocab; i != NULL;) {
-					free(i->vocab);
-					struct node *j = i->next;
-					free(i);
-					i = j;
+				struct node **curBufs = vocab;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocab) {
+						if (backtrack == NULL) {
+							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							free(vocab[i]);
+							vocab[i] = NULL;
+							curBufs = vocab;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
 				}
+				free(vocab);
 				fclose(vocabFile);
 				fclose(dump);
 				return 1;
 			}
 			if (fread(wrappedString, sizeof(struct codepoint), numCodepoints, dump) != numCodepoints) {
 				free(wrappedString);
-				for (struct node *i = vocab; i != NULL;) {
-					free(i->vocab);
-					struct node *j = i->next;
-					free(i);
-					i = j;
+				struct node **curBufs = vocab;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocab) {
+						if (backtrack == NULL) {
+							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							free(vocab[i]);
+							vocab[i] = NULL;
+							curBufs = vocab;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
 				}
+				free(vocab);
 				fclose(dump);
 				fclose(vocabFile);
 				return 1;
 			}
 			if (fseek(dump, -1 * numCodepoints * sizeof(struct codepoint), SEEK_CUR) < 0) {
 				free(wrappedString);
-				for (struct node *i = vocab; i != NULL;) {
-					free(i->vocab);
-					struct node *j = i->next;
-					free(i);
-					i = j;
+				struct node **curBufs = vocab;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocab) {
+						if (backtrack == NULL) {
+							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							free(vocab[i]);
+							vocab[i] = NULL;
+							curBufs = vocab;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
 				}
+				free(vocab);
 				fclose(vocabFile);
 				fclose(dump);
 				return 1;
 			}
-			if (generateSamplesFromString(dump, vocabFile, maxLen, wrappedString, numCodepoints, &vocab, atoi(argv[4]), strtod(argv[5], NULL), &startPoint) == -1) {
+			if (generateSamplesFromString(dump, vocabFile, &numVocabs, maxLen, wrappedString, numCodepoints, vocab, atoi(argv[4]), strtod(argv[5], NULL), &startPoint) == -1) {
 				free(wrappedString);
-				for (struct node *i = vocab; i != NULL;) {
-					free(i->vocab);
-					struct node *j = i->next;
-					free(i);
-					i = j;
+				struct node **curBufs = vocab;
+				struct node *backtrack = NULL;
+				int i = 0;
+				while (i < 256) {
+					if (curBufs[i] != NULL) {
+						backtrack = curBufs[i]->backtrack;
+						curBufs = curBufs[i]->next;
+						i = -1;
+					}
+					i++;
+					if (i == 256 && curBufs != vocab) {
+						if (backtrack == NULL) {
+							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							free(vocab[i]);
+							vocab[i] = NULL;
+							curBufs = vocab;
+						} else {
+							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							free(backtrack->next[i]);
+							backtrack->next[i] = NULL;
+							curBufs = backtrack->next;
+							backtrack = backtrack->backtrack;
+						}
+					}
 				}
+				free(vocab);
 				fclose(vocabFile);
 				fclose(dump);
 				return 1;
@@ -963,12 +1640,32 @@ int main(int argc, char *argv[]) {
 					}
 					temp.content[totLen] = '\0';
 					if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-						for (struct node *i = vocab; i != NULL;) {
-							free(i->vocab);
-							struct node *j = i->next;
-							free(i);
-							i = j;
+						struct node **curBufs = vocab;
+						struct node *backtrack = NULL;
+						int i = 0;
+						while (i < 256) {
+							if (curBufs[i] != NULL) {
+								backtrack = curBufs[i]->backtrack;
+								curBufs = curBufs[i]->next;
+								i = -1;
+							}
+							i++;
+							if (i == 256 && curBufs != vocab) {
+								if (backtrack == NULL) {
+									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									free(vocab[i]);
+									vocab[i] = NULL;
+									curBufs = vocab;
+								} else {
+									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									free(backtrack->next[i]);
+									backtrack->next[i] = NULL;
+									curBufs = backtrack->next;
+									backtrack = backtrack->backtrack;
+								}
+							}
 						}
+						free(vocab);
 						fclose(vocabFile);
 						fclose(dump);
 						return 1;
@@ -985,12 +1682,32 @@ int main(int argc, char *argv[]) {
 						temp.content[0] = *(buffer + i);
 						temp.content[1] = '\0';
 						if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-							for (struct node *i = vocab; i != NULL;) {
-								free(i->vocab);
-								struct node *j = i->next;
-								free(i);
-								i = j;
+							struct node **curBufs = vocab;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocab) {
+									if (backtrack == NULL) {
+										for (i = 0; vocab[i]->next != curBufs; i++) {}
+										free(vocab[i]);
+										vocab[i] = NULL;
+										curBufs = vocab;
+									} else {
+										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
 							}
+							free(vocab);
 							fclose(vocabFile);
 							fclose(dump);
 							return 1;
@@ -1022,12 +1739,32 @@ int main(int argc, char *argv[]) {
 					temp.content[0] = ch;
 					temp.content[1] = '\0';
 					if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-						for (struct node *i = vocab; i != NULL;) {
-							free(i->vocab);
-							struct node *j = i->next;
-							free(i);
-							i = j;
+						struct node **curBufs = vocab;
+						struct node *backtrack = NULL;
+						int i = 0;
+						while (i < 256) {
+							if (curBufs[i] != NULL) {
+								backtrack = curBufs[i]->backtrack;
+								curBufs = curBufs[i]->next;
+								i = -1;
+							}
+							i++;
+							if (i == 256 && curBufs != vocab) {
+								if (backtrack == NULL) {
+									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									free(vocab[i]);
+									vocab[i] = NULL;
+									curBufs = vocab;
+								} else {
+									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									free(backtrack->next[i]);
+									backtrack->next[i] = NULL;
+									curBufs = backtrack->next;
+									backtrack = backtrack->backtrack;
+								}
+							}
 						}
+						free(vocab);
 						fclose(vocabFile);
 						fclose(dump);
 						return 1;
@@ -1038,22 +1775,62 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	if (printf("%ld", startPoint) < 0) {
-		for (struct node *i = vocab; i != NULL;) {
-			free(i->vocab);
-			struct node *j = i->next;
-			free(i);
-			i = j;
+		struct node **curBufs = vocab;
+		struct node *backtrack = NULL;
+		int i = 0;
+		while (i < 256) {
+			if (curBufs[i] != NULL) {
+				backtrack = curBufs[i]->backtrack;
+				curBufs = curBufs[i]->next;
+				i = -1;
+			}
+			i++;
+			if (i == 256 && curBufs != vocab) {
+				if (backtrack == NULL) {
+					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					free(vocab[i]);
+					vocab[i] = NULL;
+					curBufs = vocab;
+				} else {
+					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					free(backtrack->next[i]);
+					backtrack->next[i] = NULL;
+					curBufs = backtrack->next;
+					backtrack = backtrack->backtrack;
+				}
+			}
 		}
+		free(vocab);
 		fclose(vocabFile);
 		fclose(dump);
 		return 1;
 	}
-	for (struct node *i = vocab; i != NULL;) {
-		free(i->vocab);
-		struct node *j = i->next;
-		free(i);
-		i = j;
+	struct node **curBufs = vocab;
+	struct node *backtrack = NULL;
+	int i = 0;
+	while (i < 256) {
+		if (curBufs[i] != NULL) {
+			backtrack = curBufs[i]->backtrack;
+			curBufs = curBufs[i]->next;
+			i = -1;
+		}
+		i++;
+		if (i == 256 && curBufs != vocab) {
+			if (backtrack == NULL) {
+				for (i = 0; vocab[i]->next != curBufs; i++) {}
+				free(vocab[i]);
+				vocab[i] = NULL;
+				curBufs = vocab;
+			} else {
+				for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+				free(backtrack->next[i]);
+				backtrack->next[i] = NULL;
+				curBufs = backtrack->next;
+				backtrack = backtrack->backtrack;
+			}
+		}
 	}
+	free(vocab);
 	if (fclose(vocabFile) == EOF) {
 		fclose(dump);
 		return 1;
