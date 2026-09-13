@@ -78,7 +78,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 				if (curNode == NULL) {
 					if (vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]] == NULL) {
 						vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]] = malloc(sizeof(struct node));
-						if (vocabs[wrappedString[i - 1].content[j - 1]] == NULL) {
+						if (vocabs[(unsigned char)wrappedString[i - 1].content[j - 1]] == NULL) {
 							free(buffer);
 							free(scratch);
 							free(checksum);
@@ -117,7 +117,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 				if (curNode == NULL) {
 					if (vocabs[(unsigned char)wrappedString[i - 1].content[j]] == NULL) {
 						vocabs[(unsigned char)wrappedString[i - 1].content[j]] = malloc(sizeof(struct node));
-						if (vocabs[wrappedString[i - 1].content[j]] == NULL) {
+						if (vocabs[(unsigned char)wrappedString[i - 1].content[j]] == NULL) {
 							free(buffer);
 							free(scratch);
 							free(checksum);
@@ -286,7 +286,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 			if (curNode == NULL) {
 				if (vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] == NULL) {
 					vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] = malloc(sizeof(struct node));
-					if (vocabs[wrappedString[(unsigned char)numCodepoints - 1].content[j - 1]] == NULL) {
+					if (vocabs[(unsigned char)wrappedString[numCodepoints - 1].content[j - 1]] == NULL) {
 						free(buffer);
 						free(scratch);
 						free(checksum);
@@ -851,7 +851,6 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 			quoted = 0;
 			vocLen = 0;
 			vocCount++;
-			*numVocabs = vocCount;
 		} else if (!feof(vocabFile)) {
 			if (first) {
 				first = 0;
@@ -1222,6 +1221,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 			}
 		}
 	}
+	*numVocabs = vocCount;
 	return maxDist;
 }
 int main(int argc, char *argv[]) {
