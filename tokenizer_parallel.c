@@ -598,7 +598,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 							lastVocab = vocab;
 							curPoint = wrappedString[vPos + traveled];
 							codeIndex = 0;
-							while (vPos + traveled < numCodepoints && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
+							while (vPos + traveled < numCodepoints && traveled < maxLen + startTravel && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL) {
 								if (codeIndex == strlen(curPoint.content) - 1) {
 									if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
 										if (vPos + traveled + 1 < numCodepoints) {
