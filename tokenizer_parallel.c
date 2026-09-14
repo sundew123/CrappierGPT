@@ -275,10 +275,11 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 	}
 	struct node **lastVocab = vocab;
 	char atomicExists = 0;
-	for (char i = 0; wrappedString[numCodepoints - 1].content[i] != '\0' && lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]] != NULL; i++) {
-		atomicExists = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]]->next[0] != NULL;
-		lastVocab = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[i]]->next;
+	char ii = 0;
+	for (; wrappedString[numCodepoints - 1].content[ii] != '\0' && lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[ii]] != NULL; ii++) {
+		lastVocab = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[ii]]->next;
 	}
+	atomicExists = lastVocab[(unsigned char)wrappedString[numCodepoints - 1].content[ii]]->next[0] != NULL;
 	if (!atomicExists) {
 		struct node **vocabs = vocab;
 		struct node *curNode = NULL;
