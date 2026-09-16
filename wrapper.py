@@ -106,6 +106,9 @@ toBeAdded = None
 model.zero_grad()
 source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
+decoder = json.JSONDecoder()
+decoder.parse_string = lambda start, end, strict=True: (lambda x: ((lambda main_list, separators: "".join(list(map(lambda z: main_list[z // 2] if z % 2 == 0 else separators[z // 2], range(len(main_list) + len(separators))))))(list(map(lambda w: w.encode("utf-8", errors="surrogatepass").decode("latin-1"), map(json.loads, map(lambda z: "\"" + (z[:-1] if len(z) > 0 and z[-1] == "\\" and len("".join(list(map(lambda u: "." if u != "\\" else "\\", z))).split(".")[-1]) % 2 == 1 else z) + "\"", "".join(list(map(lambda y: bytes([128]).decode("latin-1") if y.encode("latin-1")[0] > 127 else y, start[end:x[1] - 1]))).split(bytes([128]).decode("latin-1")))))), list(filter(lambda y: y.encode("latin-1")[0] > 127, start[end:x[1] - 1]))), x[1]))(json.decoder.scanstring(start, end, strict))
+decoder.scan_once = json.scanner.py_make_scanner(decoder)
 with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 	tarMembers = t.getmembers()
 	random.shuffle(tarMembers)
@@ -114,13 +117,13 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 			f = t.extractfile(m)
 			if f is not None:
 				with dctx.stream_reader(f) as d:
-					s = io.TextIOWrapper(d, encoding="utf-8")
+					s = io.TextIOWrapper(d, encoding="latin-1")
 					for l in s:
 						c = l.strip()
 						if c:
-							j = json.loads(c)
+							j = decoder.decode(c)
 							if "text" in j and len(j["text"]) != 0:
-								rawWritten = list(filter(None, bytearray(j["text"], "utf-8").split(b"\0")))
+								rawWritten = list(filter(None, bytearray(j["text"], "latin-1").split(b"\0")))
 								if len(rawWritten) > 0:
 									count = iQueue.get()
 									tQueue[count].put(rawWritten)
@@ -143,7 +146,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vocabMap = []
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											additionalVocab |= set(list(map(lambda x: bytes([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
+											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 									if len(additionalVocab) > 0:
 										oldW = model.linear3.weight
 										model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
@@ -174,7 +177,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 											optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
+											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 									for v in range(int(sys.argv[2])):
 										while os.path.isfile("output_" + str(v) + ".csv"):
 											if os.path.getsize("output_" + str(v) + ".csv") > 0 or toBeAdded != None:
@@ -255,7 +258,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 										with open("vocab.csv", "ab") as vF:
 											vF.write(b",")
 									with open("vocab.csv", "ab") as vF:
-										vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\n" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
+										vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
 									vLen += len(list(additionalVocab))
 									process = [None] * int(sys.argv[2])
 									for i in range(int(sys.argv[2])):
@@ -280,7 +283,7 @@ additionalVocab = set()
 vocabMap = []
 for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		additionalVocab |= set(list(map(lambda x: bytes([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
+		additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 if len(additionalVocab) > 0:
 	oldW = model.linear3.weight
 	model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
@@ -311,7 +314,7 @@ if len(additionalVocab) > 0:
 		optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes([int(x[2:], 16)]) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
+		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 for v in range(int(sys.argv[2])):
 	while os.path.isfile("output_" + str(v) + ".csv"):
 		if os.path.getsize("output_" + str(v) + ".csv") > 0 or toBeAdded != None:
@@ -392,7 +395,7 @@ if os.path.getsize("vocab.csv") != 0 and len(additionalVocab) != 0:
 	with open("vocab.csv", "ab") as vF:
 		vF.write(b",")
 with open("vocab.csv", "ab") as vF:
-	vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\n" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
+	vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
 resivor = resivor[:resFill]
 random.shuffle(resivor)
 replaceIndex = 0
