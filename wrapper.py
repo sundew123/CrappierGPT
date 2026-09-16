@@ -11,19 +11,25 @@ import torch
 import math
 import threading
 import queue
+import faulthandler
+faulthandler.enable()
 vLen = 0
 batch = 0
-with open("vocab.csv", encoding="utf-8", errors="backslashreplace") as vocab:
-	for r in csv.reader(vocab):
+with open("vocab.csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
+	for r in csv.reader(iter(lambda: vocab.readline().replace("\r", "."), "")):
 		vLen += len(r)
 def pThread(c, p, pQueue, iQ):
 	while True:
 		rw = pQueue.get()
 		if rw is None:
 			break
-		p.stdin.write(b"\0".join(rw) + bytes([0]))
-		p.stdin.flush()
-		iQ.put(c)
+		try:
+			p.stdin.write(b"\0".join(rw) + bytes([0]))
+			p.stdin.flush()
+			iQ.put(c)
+		except:
+			p.poll()
+			iQ.put(-1)
 process = [None] * int(sys.argv[2])
 resivor = [None] * int(sys.argv[3])
 rsize = 0
@@ -97,17 +103,18 @@ iQueue = queue.Queue()
 pprocess = [None] * int(sys.argv[2])
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8, fused=True)
 for i in range(int(sys.argv[2])):
-	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "0.0042"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "4.3"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 	process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
 	process[i].start()
 	iQueue.put(i)
 dctx = zstandard.ZstdDecompressor()
 toBeAdded = None
+count = 0
 model.zero_grad()
 source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
 target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-decoder = json.JSONDecoder()
-decoder.parse_string = lambda start, end, strict=False: (lambda x: ((lambda main_list, separators: "".join(list(map(lambda z: main_list[z // 2] if z % 2 == 0 else separators[z // 2], range(len(main_list) + len(separators))))))(list(map(lambda w: w.encode("utf-8", errors="surrogatepass").decode("latin-1"), map(json.loads, map(lambda z: "\"" + (z[:-1] if len(z) > 0 and z[-1] == "\\" and len("".join(list(map(lambda u: "." if u != "\\" else "\\", z))).split(".")[-1]) % 2 == 1 else z) + "\"", "".join(list(map(lambda y: bytes([128]).decode("latin-1") if y.encode("latin-1")[0] > 127 else y, start[end:x[1] - 1]))).split(bytes([128]).decode("latin-1")))))), list(filter(lambda y: y.encode("latin-1")[0] > 127, start[end:x[1] - 1]))), x[1]))(json.decoder.scanstring(start, end, strict))
+decoder = json.JSONDecoder(strict=False)
+decoder.parse_string = lambda start, end, strict=False: (lambda x: ((lambda main_list, separators: "".join(list(map(lambda z: main_list[z // 2] if z % 2 == 0 else separators[z // 2], range(len(main_list) + len(separators))))))(list(map(lambda w: w.encode("utf-8", errors="surrogatepass").decode("latin-1"), map(lambda v: json.loads(v, strict=False), map(lambda z: "\"" + (z[:-1] if len(z) > 0 and z[-1] == "\\" and len("".join(list(map(lambda u: "." if u != "\\" else "\\", z))).split(".")[-1]) % 2 == 1 else z) + "\"", "".join(list(map(lambda y: bytes([128]).decode("latin-1") if y.encode("latin-1")[0] > 127 else y, start[end:x[1] - 1]))).split(bytes([128]).decode("latin-1")))))), list(filter(lambda y: y.encode("latin-1")[0] > 127, start[end:x[1] - 1]))), x[1]))(json.decoder.scanstring(start, end, strict))
 decoder.scan_once = json.scanner.py_make_scanner(decoder)
 with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 	tarMembers = t.getmembers()
@@ -126,9 +133,10 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 								rawWritten = list(filter(None, bytearray(j["text"], "latin-1").split(b"\0")))
 								if len(rawWritten) > 0:
 									count = iQueue.get()
-									tQueue[count].put(rawWritten)
+									if count != -1:
+										tQueue[count].put(rawWritten)
 									batch += 1
-								if batch == int(sys.argv[1]):
+								if batch == int(sys.argv[1]) or count == -1:
 									for tt in tQueue:
 										tt.put(None)
 									for tt in process:
@@ -136,10 +144,12 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									while not iQueue.empty():
 										iQueue.get_nowait()
 									for tt in range(int(sys.argv[2])):
-										size = int(pprocess[tt].communicate()[0])
-										if pprocess[tt].returncode == 1:
+										size = 0
+										pprocess[tt].poll()
+										if count == -1 or pprocess[tt].returncode != None:
 											sys.exit(1)
 										with open("output_" + str(tt) + ".csv", "r+b") as f:
+											size = int(pprocess[tt].communicate()[0])
 											f.truncate(size)
 									batch = 0
 									additionalVocab = set()
@@ -262,7 +272,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vLen += len(list(additionalVocab))
 									process = [None] * int(sys.argv[2])
 									for i in range(int(sys.argv[2])):
-										pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "0.0042"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+										pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "4.3"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 										process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
 										process[i].start()
 										iQueue.put(i)
@@ -273,10 +283,12 @@ for t in process:
 while not iQueue.empty():
 	iQueue.get_nowait()
 for t in range(int(sys.argv[2])):
-	size = int(pprocess[t].communicate()[0])
-	if pprocess[t].returncode == 1:
+	size = 0
+	pprocess[t].poll()
+	if count == -1 or pprocess[t].returncode != None:
 		sys.exit(1)
 	with open("output_" + str(t) + ".csv", "r+b") as f:
+		size = int(pprocess[t].communicate()[0])
 		f.truncate(size)
 batch = 0
 additionalVocab = set()
