@@ -12,6 +12,7 @@ import math
 import threading
 import queue
 import faulthandler
+import atexit
 faulthandler.enable()
 vLen = 0
 batch = 0
@@ -82,11 +83,11 @@ class Network(torch.nn.Module):
 	def  __init__(self):
 		super().__init__()
 		self.dropout = torch.nn.Dropout(0.1)
-		self.emb = torch.nn.Embedding(50256, 768)
+		self.emb = torch.nn.Embedding(vLen, 768)
 		self.register_buffer("pos", (torch.fmod(torch.arange(self.emb.embedding_dim), 2).unsqueeze(0) * torch.sin(torch.arange(int(sys.argv[4])).unsqueeze(1) / torch.pow(torch.tensor(10000), torch.floor(torch.arange(self.emb.embedding_dim) / 2).unsqueeze(0) * 2 / self.emb.embedding_dim)) + (1 - torch.fmod(torch.arange(self.emb.embedding_dim), 2).unsqueeze(0)) * torch.cos(torch.arange(int(sys.argv[4])).unsqueeze(1) / torch.pow(torch.tensor(10000), torch.floor(torch.arange(self.emb.embedding_dim) / 2).unsqueeze(0) * 2 / self.emb.embedding_dim))))
 		self.temp = [Layer(self.emb.embedding_dim, 12, 64) for _ in range(12)]
 		self.layers = torch.nn.Sequential(*self.temp)
-		self.linear3 = torch.nn.Linear(self.emb.embedding_dim, 50256, bias=False)
+		self.linear3 = torch.nn.Linear(self.emb.embedding_dim, vLen, bias=False)
 		self.emb.weight = self.linear3.weight
 	def forward(self, x):
 		embed = self.dropout(self.emb(x) + self.pos[:x.size(-1), :].unsqueeze(0))
@@ -104,9 +105,10 @@ pprocess = [None] * int(sys.argv[2])
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8, fused=True)
 for i in range(int(sys.argv[2])):
 	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "4.3"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-	process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
+	process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue), daemon=True)
 	process[i].start()
 	iQueue.put(i)
+atexit.register(lambda: list(map(lambda pp: (pp.kill(), pp.wait()) if pp is not None and pp.poll() is None else None, pprocess)))
 dctx = zstandard.ZstdDecompressor()
 toBeAdded = None
 count = 0
@@ -273,7 +275,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									process = [None] * int(sys.argv[2])
 									for i in range(int(sys.argv[2])):
 										pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "4.3"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-										process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue))
+										process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue), daemon=True)
 										process[i].start()
 										iQueue.put(i)
 for t in tQueue:
