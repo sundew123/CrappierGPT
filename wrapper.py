@@ -160,6 +160,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 									if len(additionalVocab) > 0:
+										torch._dynamo.reset()
 										oldW = model.linear3.weight
 										model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
 										model.emb.num_embeddings = model.emb.weight.size(0) + len(additionalVocab)
@@ -187,6 +188,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 											optimizer.state[model.linear3.weight] = {"step": old["step"].to(oldD[1]), "exp_avg": torch.cat((old["exp_avg"], torch.zeros(len(additionalVocab), oldD[3], dtype=oldD[0])), 0).to(oldD[1]), "exp_avg_sq": torch.cat((old["exp_avg_sq"], torch.zeros(len(additionalVocab), oldD[3], dtype=oldD[0])), 0).to(oldD[1])}
 										if oldG is not None:
 											optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
+										torch.cuda.empty_cache()
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
@@ -299,6 +301,7 @@ for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 		additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 if len(additionalVocab) > 0:
+	torch._dynamo.reset()
 	oldW = model.linear3.weight
 	model.linear3.out_features = model.linear3.weight.size(0) + len(additionalVocab)
 	model.emb.num_embeddings = model.emb.weight.size(0) + len(additionalVocab)
@@ -326,6 +329,7 @@ if len(additionalVocab) > 0:
 		optimizer.state[model.linear3.weight] = {"step": old["step"].to(oldD[1]), "exp_avg": torch.cat((old["exp_avg"], torch.zeros(len(additionalVocab), oldD[3], dtype=oldD[0])), 0).to(oldD[1]), "exp_avg_sq": torch.cat((old["exp_avg_sq"], torch.zeros(len(additionalVocab), oldD[3], dtype=oldD[0])), 0).to(oldD[1])}
 	if oldG is not None:
 		optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
+	torch.cuda.empty_cache()
 for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
