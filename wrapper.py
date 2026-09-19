@@ -34,16 +34,16 @@ def pThread(c, p, pQueue, iQ):
 process = [None] * int(sys.argv[2])
 resivor = [None] * int(sys.argv[3])
 rsize = 0
-batchSize = int(108.8 * int(sys.argv[4]))
+batchSize = int(78.125 * int(sys.argv[4]))
 batchFill = 0
-batchCap = 10200 * int(sys.argv[4])
+batchCap = 1200 * int(sys.argv[4])
 resFill = 0
 step = 0
 toBeAdded = None
 max_rate = 6e-4
 min_rate = 6e-5
-warmup = 5800
-max_iters = 1740000
+warmup = 4000
+max_iters = 129000
 class MaskedAttention(torch.nn.Module):
 	def __init__(self, emb_dim, heads, dims):
 		super().__init__()
@@ -102,7 +102,7 @@ lFunc = torch.nn.NLLLoss(ignore_index=-1)
 tQueue = [queue.Queue() for _ in range(int(sys.argv[2]))]
 iQueue = queue.Queue()
 pprocess = [None] * int(sys.argv[2])
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8, fused=True)
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8, fused=True, weight_decay=0.1)
 for i in range(int(sys.argv[2])):
 	pprocess[i] = subprocess.Popen(["./tokenizer_parallel", "output_" + str(i) + ".csv", "vocab.csv", "vocab_" + str(i) + ".csv", sys.argv[4], "4.3"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 	process[i] = threading.Thread(target=pThread, args=(i, pprocess[i], tQueue[i], iQueue), daemon=True)
@@ -237,7 +237,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 															rate += 1
 															model.zero_grad()
 															batchFill = 0
-															batchSize = (batchSize + int(int(sys.argv[4]) * 54.4)) if batchSize < batchCap else batchSize
+															batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
 													source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 													target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 													if random.randint(0, int(sys.argv[3])) == 0:
@@ -378,7 +378,7 @@ for v in range(int(sys.argv[2])):
 						rate += 1
 						model.zero_grad()
 						batchFill = 0
-						batchSize = (batchSize + int(int(sys.argv[4]) * 54.4)) if batchSize < batchCap else batchSize
+						batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
 				source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 				target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 				if random.randint(0, int(sys.argv[3])) == 0:
@@ -441,7 +441,7 @@ while replaceIndex < len(resivor):
 			rate += 1
 			model.zero_grad()
 			batchFill = 0
-			batchSize = (batchSize + int(int(sys.argv[4]) * 54.4)) if batchSize < batchCap else batchSize
+			batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
 	source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 	target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
 	if batchSize - batchFill < len(resivor[replaceIndex][0]):
