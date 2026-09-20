@@ -89,16 +89,15 @@ class Network(torch.nn.Module):
 		self.layers = torch.nn.Sequential(*self.temp)
 		self.linear3 = torch.nn.Linear(self.emb.embedding_dim, vLen, bias=False)
 		self.emb.weight = self.linear3.weight
-	def forward(self, x):
+	def forward(self, x, target):
 		embed = self.dropout(self.emb(x) + self.pos[:x.size(-1), :].unsqueeze(0))
 		layer = self.layers(embed)
 		lin3 = self.linear3(layer)
-		return torch.log_softmax(lin3, dim=-1)
+		return -torch.log_softmax(lin3, dim=-1)[torch.arange(lin3.size(0), device="cuda").unsqueeze(-1), torch.arange(lin3.size(1), device="cuda").unsqueeze(0), target.clamp(min=0)].masked_fill(target == -1, 0).sum()
 rate = 0
 torch._dynamo.config.recompile_limit = float("inf")
 torch.set_float32_matmul_precision('high')
 model = torch.compile(Network().to("cuda"))
-lFunc = torch.nn.NLLLoss(ignore_index=-1)
 tQueue = [queue.Queue() for _ in range(int(sys.argv[2]))]
 iQueue = queue.Queue()
 pprocess = [None] * int(sys.argv[2])
@@ -113,8 +112,8 @@ dctx = zstandard.ZstdDecompressor()
 toBeAdded = None
 count = 0
 model.zero_grad()
-source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
+source = torch.empty(0, int(sys.argv[4])).long()
+target = torch.empty(0, int(sys.argv[4])).long()
 decoder = json.JSONDecoder(strict=False)
 decoder.parse_string = lambda start, end, strict=False: (lambda x: ((lambda main_list, separators: "".join(list(map(lambda z: main_list[z // 2] if z % 2 == 0 else separators[z // 2], range(len(main_list) + len(separators))))))(list(map(lambda w: w.encode("utf-8", errors="surrogatepass").decode("latin-1"), map(lambda v: json.loads(v, strict=False), map(lambda z: "\"" + (z[:-1] if len(z) > 0 and z[-1] == "\\" and len("".join(list(map(lambda u: "." if u != "\\" else "\\", z))).split(".")[-1]) % 2 == 1 else z) + "\"", "".join(list(map(lambda y: bytes([128]).decode("latin-1") if y.encode("latin-1")[0] > 127 else y, start[end:x[1] - 1]))).split(bytes([128]).decode("latin-1")))))), list(filter(lambda y: y.encode("latin-1")[0] > 127, start[end:x[1] - 1]))), x[1]))(json.decoder.scanstring(start, end, strict))
 decoder.scan_once = json.scanner.py_make_scanner(decoder)
@@ -204,10 +203,12 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 												else:
 													if batchFill == batchSize or source.size(0) == 16:
 														with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-															loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
+															source = source.to("cuda")
+															target = target.to("cuda")
+															loss = model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long()), target) / batchSize
 															loss.backward()
-														source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-														target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
+														source = torch.empty(0, int(sys.argv[4])).long()
+														target = torch.empty(0, int(sys.argv[4])).long()
 														if batchFill == batchSize:
 															torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 															if rate < warmup:
@@ -226,31 +227,31 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 															model.zero_grad()
 															batchFill = 0
 															batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
-													source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
-													target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
+													source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).long()), 0)
+													target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).long()), 0)
 													if random.randint(0, int(sys.argv[3])) == 0:
 														if batchSize - batchFill < len(toBeAdded[0]):
-															source[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[0][:batchSize - batchFill]).to("cuda").long()
+															source[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[0][:batchSize - batchFill]).long()
 															toBeAdded[0] = toBeAdded[0][batchSize - batchFill:]
-															target[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[1][:batchSize - batchFill]).to("cuda").long()
+															target[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[1][:batchSize - batchFill]).long()
 															toBeAdded[1] = toBeAdded[1][batchSize - batchFill:]
 															batchFill = batchSize
 														else:
-															source[-1, :len(toBeAdded[0])] = torch.tensor(toBeAdded[0]).to("cuda").long()
-															target[-1, :len(toBeAdded[1])] = torch.tensor(toBeAdded[1]).to("cuda").long()
+															source[-1, :len(toBeAdded[0])] = torch.tensor(toBeAdded[0]).long()
+															target[-1, :len(toBeAdded[1])] = torch.tensor(toBeAdded[1]).long()
 															batchFill += len(toBeAdded[0])
 															toBeAdded = None
 													else:
 														replaceIndex = random.randint(0, int(sys.argv[3]) - 1)
 														if batchSize - batchFill < len(resivor[replaceIndex][0]):
-															source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).to("cuda").long()
+															source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).long()
 															resivor[replaceIndex][0] = resivor[replaceIndex][0][batchSize - batchFill:]
-															target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).to("cuda").long()
+															target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).long()
 															resivor[replaceIndex][1] = resivor[replaceIndex][1][batchSize - batchFill:]
 															batchFill = batchSize
 														else:
-															source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).to("cuda").long()
-															target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).to("cuda").long()
+															source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).long()
+															target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).long()
 															batchFill += len(resivor[replaceIndex][0])
 															resivor[replaceIndex] = toBeAdded
 															toBeAdded = None
@@ -334,10 +335,12 @@ for v in range(int(sys.argv[2])):
 			else:
 				if batchFill == batchSize or source.size(0) == 16:
 					with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-						loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
+						source = source.to("cuda")
+						target = target.to("cuda")
+						loss = model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long()), target) / batchSize
 						loss.backward()
-					source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-					target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
+					source = torch.empty(0, int(sys.argv[4])).long()
+					target = torch.empty(0, int(sys.argv[4])).long()
 					if batchFill == batchSize:
 						torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 						if rate < warmup:
@@ -356,31 +359,31 @@ for v in range(int(sys.argv[2])):
 						model.zero_grad()
 						batchFill = 0
 						batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
-				source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
-				target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
+				source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).long()), 0)
+				target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).long()), 0)
 				if random.randint(0, int(sys.argv[3])) == 0:
 					if batchSize - batchFill < len(toBeAdded[0]):
-						source[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[0][:batchSize - batchFill]).to("cuda").long()
+						source[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[0][:batchSize - batchFill]).long()
 						toBeAdded[0] = toBeAdded[0][batchSize - batchFill:]
-						target[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[1][:batchSize - batchFill]).to("cuda").long()
+						target[-1, :batchSize - batchFill] = torch.tensor(toBeAdded[1][:batchSize - batchFill]).long()
 						toBeAdded[1] = toBeAdded[1][batchSize - batchFill:]
 						batchFill = batchSize
 					else:
-						source[-1, :len(toBeAdded[0])] = torch.tensor(toBeAdded[0]).to("cuda").long()
-						target[-1, :len(toBeAdded[1])] = torch.tensor(toBeAdded[1]).to("cuda").long()
+						source[-1, :len(toBeAdded[0])] = torch.tensor(toBeAdded[0]).long()
+						target[-1, :len(toBeAdded[1])] = torch.tensor(toBeAdded[1]).long()
 						batchFill += len(toBeAdded[0])
 						toBeAdded = None
 				else:
 					replaceIndex = random.randint(0, int(sys.argv[3]) - 1)
 					if batchSize - batchFill < len(resivor[replaceIndex][0]):
-						source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).to("cuda").long()
+						source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).long()
 						resivor[replaceIndex][0] = resivor[replaceIndex][0][batchSize - batchFill:]
-						target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).to("cuda").long()
+						target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).long()
 						resivor[replaceIndex][1] = resivor[replaceIndex][1][batchSize - batchFill:]
 						batchFill = batchSize
 					else:
-						source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).to("cuda").long()
-						target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).to("cuda").long()
+						source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).long()
+						target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).long()
 						batchFill += len(resivor[replaceIndex][0])
 						resivor[replaceIndex] = toBeAdded
 						toBeAdded = None
@@ -398,10 +401,12 @@ replaceIndex = 0
 while replaceIndex < len(resivor):
 	if batchFill == batchSize or source.size(0) == 16:
 		with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-			loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
+			source = source.to("cuda")
+			target = target.to("cuda")
+			loss = model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long()), target) / batchSize
 			loss.backward()
-		source = torch.empty(0, int(sys.argv[4])).to("cuda").long()
-		target = torch.empty(0, int(sys.argv[4])).to("cuda").long()
+		source = torch.empty(0, int(sys.argv[4])).long()
+		target = torch.empty(0, int(sys.argv[4])).long()
 		if batchFill == batchSize:
 			torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 			if rate < warmup:
@@ -420,22 +425,24 @@ while replaceIndex < len(resivor):
 			model.zero_grad()
 			batchFill = 0
 			batchSize = (batchSize + int(int(sys.argv[4]) * 0.073)) if batchSize < batchCap else batchSize
-	source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
-	target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).to("cuda").long()), 0)
+	source = torch.cat((source, -torch.ones(1, int(sys.argv[4])).long()), 0)
+	target = torch.cat((target, -torch.ones(1, int(sys.argv[4])).long()), 0)
 	if batchSize - batchFill < len(resivor[replaceIndex][0]):
-		source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).to("cuda").long()
+		source[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][0][:batchSize - batchFill]).long()
 		resivor[replaceIndex][0] = resivor[replaceIndex][0][batchSize - batchFill:]
-		target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).to("cuda").long()
+		target[-1, :batchSize - batchFill] = torch.tensor(resivor[replaceIndex][1][:batchSize - batchFill]).long()
 		resivor[replaceIndex][1] = resivor[replaceIndex][1][batchSize - batchFill:]
 		batchFill = batchSize
 	else:
-		source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).to("cuda").long()
-		target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).to("cuda").long()
+		source[-1, :len(resivor[replaceIndex][0])] = torch.tensor(resivor[replaceIndex][0]).long()
+		target[-1, :len(resivor[replaceIndex][1])] = torch.tensor(resivor[replaceIndex][1]).long()
 		batchFill += len(resivor[replaceIndex][0])
 		replaceIndex += 1
 if source.size(0) > 0:
 	with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-		loss = lFunc(model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long())).reshape(-1, model.linear3.weight.size(0)), target.reshape(-1)) * ((target != -1).sum() / batchSize)
+		source = source.to("cuda")
+		target = target.to("cuda")
+		loss = model(torch.maximum(source, torch.zeros(source.size()).to("cuda").long()), target) / batchSize
 		loss.backward()
 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 if rate < warmup:
@@ -524,8 +531,8 @@ for param in startGen.parameters():
 	param.requires_grad = False
 cBuffer = torch.multinomial(torch.exp(startGen(evalModel.emb.weight.mean(0, keepdim=True).to("cpu")).view(-1)), 1).to("cuda").unsqueeze(-1)
 vocab = []
-with open("vocab.csv", encoding="utf-8", errors="replace") as f:
-	vocab = next(csv.reader(f), [])
+with open("vocab.csv", encoding="utf-8", errors="replace", newline="\n") as f:
+	vocab = next(csv.reader(iter(lambda: f.readline().replace("\r", "\"\r\""), "")), [])
 while True:
 	print(vocab[cBuffer[0, -1]], end="")
 	if cBuffer.size(-1) < int(sys.argv[4]):
