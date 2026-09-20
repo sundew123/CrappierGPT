@@ -193,22 +193,10 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 									for v in range(int(sys.argv[2])):
-										while os.path.isfile("output_" + str(v) + ".csv"):
-											if os.path.getsize("output_" + str(v) + ".csv") > 0 or toBeAdded != None:
-												if toBeAdded == None:
-													with open("output_" + str(v) + ".csv", "r+b") as tokFile:
-														tokFile.seek(0, 2)
-														while tokFile.tell() != 0 and (tokFile.peek(1) == b"" or tokFile.peek(1)[0] != ord("\n")):
-															tokFile.seek(-1, 1)
-															if tokFile.peek(1)[0] == ord("\n") or tokFile.tell() == 0:
-																tempPos = tokFile.tell()
-																toBeAdded = tokFile.read()
-																tokFile.seek(tempPos)
-																if toBeAdded[0] == ord("\n"):
-																	toBeAdded = toBeAdded[1:]
-																toBeAdded = toBeAdded.decode("utf-8").replace("\"", "").split(",")
-																toBeAdded = [list(map(lambda x: x if x < vLen else (vocabMap[v][x - vLen] + vLen), list(map(int, toBeAdded[0::2])))), list(map(lambda x: x if x < vLen else (vocabMap[v][x - vLen] + vLen), list(map(int, toBeAdded[1::2]))))]
-														tokFile.truncate()
+										with open("output_" + str(v) + ".csv") as tokFile:
+											outR = csv.reader(tokFile)
+											toBeAdded = list(zip(*list(map(lambda y: list(map(lambda x: int(x) if int(x) < vLen else (vocabMap[v][int(x) - vLen] + vLen), y.split(","))), next(outR, [])))))
+											while toBeAdded != []:
 												if resFill < int(sys.argv[3]):
 													resivor[resFill] = toBeAdded
 													resFill += 1
@@ -266,8 +254,9 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 															batchFill += len(resivor[replaceIndex][0])
 															resivor[replaceIndex] = toBeAdded
 															toBeAdded = None
-											if toBeAdded == None and os.path.getsize("output_" + str(v) + ".csv") == 0:
-												os.remove("output_" + str(v) + ".csv")
+												if toBeAdded == None:
+													toBeAdded = list(zip(*list(map(lambda y: list(map(lambda x: int(x) if int(x) < vLen else (vocabMap[v][int(x) - vLen] + vLen), y.split(","))), next(outR, [])))))
+											os.remove("output_" + str(v) + ".csv")
 									if os.path.getsize("vocab.csv") != 0 and len(additionalVocab) != 0:
 										with open("vocab.csv", "ab") as vF:
 											vF.write(b",")
@@ -334,22 +323,10 @@ for v in range(int(sys.argv[2])):
 	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
 		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
 for v in range(int(sys.argv[2])):
-	while os.path.isfile("output_" + str(v) + ".csv"):
-		if os.path.getsize("output_" + str(v) + ".csv") > 0 or toBeAdded != None:
-			if toBeAdded == None:
-				with open("output_" + str(v) + ".csv", "r+b") as tokFile:
-					tokFile.seek(0, 2)
-					while tokFile.tell() != 0 and (tokFile.peek(1) == b"" or tokFile.peek(1)[0] != ord("\n")):
-						tokFile.seek(-1, 1)
-						if tokFile.peek(1)[0] == ord("\n") or tokFile.tell() == 0:
-							tempPos = tokFile.tell()
-							toBeAdded = tokFile.read()
-							tokFile.seek(tempPos)
-							if toBeAdded[0] == ord("\n"):
-								toBeAdded = toBeAdded[1:]
-							toBeAdded = toBeAdded.decode("utf-8").replace("\"", "").split(",")
-							toBeAdded = [list(map(lambda x: x if x < vLen else (vocabMap[v][x - vLen] + vLen), list(map(int, toBeAdded[0::2])))), list(map(lambda x: x if x < vLen else (vocabMap[v][x - vLen] + vLen), list(map(int, toBeAdded[1::2]))))]
-					tokFile.truncate()
+	with open("output_" + str(v) + ".csv") as tokFile:
+		outR = csv.reader(tokFile)
+		toBeAdded = list(zip(*list(map(lambda y: list(map(lambda x: int(x) if int(x) < vLen else (vocabMap[v][int(x) - vLen] + vLen), y.split(","))), next(outR, [])))))
+		while toBeAdded != []:
 			if resFill < int(sys.argv[3]):
 				resivor[resFill] = toBeAdded
 				resFill += 1
@@ -407,8 +384,9 @@ for v in range(int(sys.argv[2])):
 						batchFill += len(resivor[replaceIndex][0])
 						resivor[replaceIndex] = toBeAdded
 						toBeAdded = None
-		if toBeAdded == None and os.path.getsize("output_" + str(v) + ".csv") == 0:
-			os.remove("output_" + str(v) + ".csv")
+			if toBeAdded == None:
+				toBeAdded = list(zip(*list(map(lambda y: list(map(lambda x: int(x) if int(x) < vLen else (vocabMap[v][int(x) - vLen] + vLen), y.split(","))), next(outR, [])))))
+		os.remove("output_" + str(v) + ".csv")
 if os.path.getsize("vocab.csv") != 0 and len(additionalVocab) != 0:
 	with open("vocab.csv", "ab") as vF:
 		vF.write(b",")
