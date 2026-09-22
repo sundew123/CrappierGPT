@@ -17,7 +17,7 @@ faulthandler.enable()
 vLen = 0
 batch = 0
 with open("vocab.csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
-	for r in csv.reader(iter(lambda: vocab.readline().replace("\r", "."), "")):
+	for r in csv.reader(iter(lambda: next(vocab).replace("\r", "\"\r\""), "")):
 		vLen += len(r)
 def pThread(c, p, pQueue, iQ):
 	while True:
@@ -156,8 +156,8 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									additionalVocab = set()
 									vocabMap = []
 									for v in range(int(sys.argv[2])):
-										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
+										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
+											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(iter(lambda: next(vocab).replace("\r", "\"\r\""), "")), []))))
 									if len(additionalVocab) > 0:
 										torch._dynamo.reset()
 										oldW = model.linear3.weight
@@ -189,8 +189,8 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 											optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 										torch.cuda.empty_cache()
 									for v in range(int(sys.argv[2])):
-										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
+										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
+											vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(iter(lambda: next(vocab).replace("\r", "\"\r\""), "")), [])))))]
 									for v in range(int(sys.argv[2])):
 										with open("output_" + str(v) + ".csv") as tokFile:
 											outR = csv.reader(tokFile)
@@ -288,8 +288,8 @@ batch = 0
 additionalVocab = set()
 vocabMap = []
 for v in range(int(sys.argv[2])):
-	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
+	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
+		additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(iter(lambda: next(vocab).replace("\r", "\"\r\""), "")), []))))
 if len(additionalVocab) > 0:
 	torch._dynamo.reset()
 	oldW = model.linear3.weight
@@ -321,8 +321,8 @@ if len(additionalVocab) > 0:
 		optimizer.param_groups[oldG]["params"][oldI] = model.linear3.weight
 	torch.cuda.empty_cache()
 for v in range(int(sys.argv[2])):
-	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace") as vocab:
-		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), [])))))]
+	with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
+		vocabMap += [list(map(lambda x: list(additionalVocab).index(x), list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(iter(lambda: next(vocab).replace("\r", "\"\r\""), "")), [])))))]
 for v in range(int(sys.argv[2])):
 	with open("output_" + str(v) + ".csv") as tokFile:
 		outR = csv.reader(tokFile)
@@ -532,7 +532,7 @@ for param in startGen.parameters():
 cBuffer = torch.multinomial(torch.exp(startGen(evalModel.emb.weight.mean(0, keepdim=True).to("cpu")).view(-1)), 1).to("cuda").unsqueeze(-1)
 vocab = []
 with open("vocab.csv", encoding="utf-8", errors="replace", newline="\n") as f:
-	vocab = next(csv.reader(iter(lambda: f.readline().replace("\r", "\"\r\""), "")), [])
+	vocab = next(csv.reader(iter(lambda: next(f).replace("\r", "\"\r\""), "")), [])
 while True:
 	print(vocab[cBuffer[0, -1]], end="")
 	if cBuffer.size(-1) < int(sys.argv[4]):
