@@ -515,7 +515,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 					leftovers[maxLen * j + queueStart] += pow(2, leftovers[maxLen * (j + 1) + (queueStart + k + 1) % maxLen] - maxLeft);
 				}
 			}
-			if (leftovers[maxLen * j + queueStart]) {
+			if (maxLeft != log2(0)) {
 				leftovers[maxLen * j + queueStart] = maxLeft + log2(leftovers[maxLen * j + queueStart]);
 			} else {
 				leftovers[maxLen * j + queueStart] = log2(0);
