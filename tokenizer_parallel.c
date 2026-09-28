@@ -187,6 +187,13 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 					free(checksum);
 					return -1;
 				}
+			} else if (!strcmp(wrappedString[i - 1].content, "\r")) {
+				if (fwrite("\"\r\"", sizeof(char), 3, vocabFile) != 3) {
+					free(buffer);
+					free(scratch);
+					free(checksum);
+					return -1;
+				}
 			} else {
 				if (fwrite(wrappedString[i - 1].content, sizeof(char), strlen(wrappedString[i - 1].content), vocabFile) != strlen(wrappedString[i - 1].content)) {
 					free(buffer);
@@ -396,6 +403,13 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 				free(checksum);
 				return -1;
 			}
+		} else if (!strcmp(wrappedString[numCodepoints - 1].content, "\r")) {
+			if (fwrite("\"\r\"", sizeof(char), 3, vocabFile) != 3) {
+				free(buffer);
+				free(scratch);
+				free(checksum);
+				return -1;
+			}
 		} else {
 			if (fwrite(wrappedString[numCodepoints - 1].content, sizeof(char), strlen(wrappedString[numCodepoints - 1].content), vocabFile) != strlen(wrappedString[numCodepoints - 1].content)) {
 				free(buffer);
@@ -543,23 +557,31 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 						char codeIndex = 0;
 						size_t traveled = 0;
 						size_t startTravel;
-						while (vPos + traveled < numCodepoints - 1 && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL && random >= 0) {
+						while (vPos + traveled < numCodepoints && traveled < maxLen && lastVocab[(unsigned char)curPoint.content[codeIndex]] != NULL && random >= 0) {
 							if (codeIndex == strlen(curPoint.content) - 1) {
 								if (lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0] != NULL) {
-									random -= pow(2, wrappedString[vPos + traveled + 1].logTokenizations - wrappedString[vPos].logTokenizations);
-									ind = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
+									if (vPos + traveled + 1 < numCodepoints) {
+										random -= pow(2, wrappedString[vPos + traveled + 1].logTokenizations - wrappedString[vPos].logTokenizations);
+										ind = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
+									} else {
+										random -= pow(2, -wrappedString[vPos].logTokenizations);
+										ind = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next[0]->vocab;
+									}
+									startTravel = traveled + 1;
 								}
 								lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
 								traveled++;
-								curPoint = wrappedString[vPos + traveled];
+								if (vPos + traveled < numCodepoints) {
+									curPoint = wrappedString[vPos + traveled];
+								}
 								codeIndex = 0;
 							} else {
 								lastVocab = lastVocab[(unsigned char)curPoint.content[codeIndex]]->next;
 								codeIndex++;
 							}
 						}
-						startTravel = traveled;
-						if (random < 0) {
+						traveled = startTravel;
+						if (vPos + traveled < numCodepoints) {
 							if (!k && *startPoint > 0) {
 								if (fwrite("\n", sizeof(char), 1, dump) != 1) {
 									free(buffer);
@@ -710,7 +732,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 				first = 1;
 			}
 		}
-		if ((feof(vocabFile) && !fileStart) || ((ch == ',' || ch == '\n') && escaped)) {
+		if ((feof(vocabFile) && !fileStart) || ((ch == ',' || ch == '\n' || ch == '\r') && escaped)) {
 			if (bufDist > 0 && bufPoint == bufDist && utfVal > 127 && utfVal < 1114112 && (((utfVal >> 7) && bufDist == 2) || ((utfVal >> 11) && bufDist == 3) || ((utfVal >> 16) && bufDist == 4))) {
 				dist++;
 			} else if (bufDist) {
