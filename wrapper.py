@@ -157,7 +157,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vocabMap = []
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
-											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(vocab), []))))
+											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab)), []))))
 									if len(additionalVocab) > 0:
 										torch._dynamo.reset()
 										oldW = model.linear3.weight
@@ -262,7 +262,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 										with open("vocab.csv", "ab") as vF:
 											vF.write(b",")
 									with open("vocab.csv", "ab") as vF:
-										vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
+										vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else (b"\"\r\"" if x == b"\r" else x))), list(additionalVocab)))))
 									vLen += len(list(additionalVocab))
 									process = [None] * int(sys.argv[2])
 									for i in range(int(sys.argv[2])):
@@ -394,7 +394,7 @@ if os.path.getsize("vocab.csv") != 0 and len(additionalVocab) != 0:
 	with open("vocab.csv", "ab") as vF:
 		vF.write(b",")
 with open("vocab.csv", "ab") as vF:
-	vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else x)), list(additionalVocab)))))
+	vF.write(b",".join(list(map(lambda x: b"\"\"\"\"" if x == b"\"" else (b"\"\n\"" if x == b"\n" else (b"\",\"" if x == b"," else (b"\"\r\"" if x == b"\r" else x))), list(additionalVocab)))))
 resivor = resivor[:resFill]
 random.shuffle(resivor)
 replaceIndex = 0
