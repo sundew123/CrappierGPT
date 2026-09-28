@@ -157,7 +157,7 @@ with tarfile.open("openwebtext2.jsonl.zst.tar") as t:
 									vocabMap = []
 									for v in range(int(sys.argv[2])):
 										with open("vocab_" + str(v) + ".csv", encoding="utf-8", errors="backslashreplace", newline="\n") as vocab:
-											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab)), []))))
+											additionalVocab |= set(list(map(lambda x: bytes(list(map(lambda y: int(y, 16), x[2:].split("\\x")))) if x.startswith("\\x") else x.encode(), next(csv.reader(vocab), []))))
 									if len(additionalVocab) > 0:
 										torch._dynamo.reset()
 										oldW = model.linear3.weight
