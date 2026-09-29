@@ -688,6 +688,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 	char bufPoint = 0;
 	size_t utfVal = 0;
 	size_t vocCount = 0;
+	char prevCharacter = 0;
 	while (!feof(vocabFile)) {
 		int ch = getc(vocabFile);
 		if (ch == EOF && !feof(vocabFile)) {
@@ -724,7 +725,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 		} else if (fileStart && !feof(vocabFile)) {
 			fileStart = 0;
 		}
-		if (start) {
+		if (start && (prevCharacter != '\r' || ch != '\n')) {
 			start = 0;
 			if (!feof(vocabFile) && ch == '"') {
 				escaped = 0;
@@ -732,7 +733,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 				first = 1;
 			}
 		}
-		if ((feof(vocabFile) && !fileStart) || ((ch == ',' || ch == '\n' || ch == '\r') && escaped)) {
+		if ((feof(vocabFile) && !fileStart) || ((ch == ',' || ch == '\n' || ch == '\r') && (prevCharacter != '\r' || ch != '\n') && escaped)) {
 			if (bufDist > 0 && bufPoint == bufDist && utfVal > 127 && utfVal < 1114112 && (((utfVal >> 7) && bufDist == 2) || ((utfVal >> 11) && bufDist == 3) || ((utfVal >> 16) && bufDist == 4))) {
 				dist++;
 			} else if (bufDist) {
@@ -874,7 +875,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 			quoted = 0;
 			vocLen = 0;
 			vocCount++;
-		} else if (!feof(vocabFile)) {
+		} else if (!feof(vocabFile) && (!escaped || prevCharacter != '\r' || ch != '\n')) {
 			if (first) {
 				first = 0;
 			} else if (quoted) {
@@ -1243,6 +1244,7 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 				vocLen++;
 			}
 		}
+		prevCharacter = ch;
 	}
 	*numVocabs = vocCount;
 	return maxDist;
