@@ -546,8 +546,8 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 	double sumExpVal = rand() / (double)((unsigned int)RAND_MAX + 1u);
 	for (size_t i = 0; i < numCodepoints; i++) {
 		if (wrappedString[i].valid) {
-			for (size_t j = 0; j < (size_t)(wrappedString[i].entropy / log2(exp(1.0)) * scaling + 1); j++) {
-				if (round(sumExpVal + pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations)) - round(sumExpVal) != 0) {
+			for (size_t j = 0; j < (size_t)(fmax(wrappedString[i].entropy / log2(exp(1.0)), 0) * scaling + 1); j++) {
+				if (round(sumExpVal + fmax(pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), 0)) - round(sumExpVal) != 0) {
 					size_t vPos = i;
 					for (size_t k = 0; k < context && vPos < numCodepoints - 1; k++) {
 						double random = (double)rand() / ((unsigned int)RAND_MAX + 1u);
@@ -663,7 +663,7 @@ long int generateSamplesFromString(FILE *dump, FILE *vocabFile, size_t *numVocab
 						vPos += startTravel;
 					}
 				}
-				sumExpVal += pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations);
+				sumExpVal += fmax(pow(2, wrappedString[i].sampleLog + wrappedString[i].logTokenizations - wrappedString[0].logTokenizations), 0);
 			}
 		}
 	}
