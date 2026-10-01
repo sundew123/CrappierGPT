@@ -1389,17 +1389,60 @@ int main(int argc, char *argv[]) {
 				for (int i = 1; i < totLen; i++) {
 					utfValue = (utfValue << 6) + (buffer[i] & 63);
 				}
-			}
-			if (bufLen < totLen || utfValue < 128 || utfValue > 1114111 || !(((utfValue >> 7) && totLen == 2) || ((utfValue >> 11) && totLen == 3) || ((utfValue >> 16) && totLen == 4))) {
-				for (char i = 0; i < bufLen; i++) {
+				if (bufLen < totLen || utfValue < 128 || utfValue > 1114111 || !(((utfValue >> 7) && totLen == 2) || ((utfValue >> 11) && totLen == 3) || ((utfValue >> 16) && totLen == 4))) {
+					for (char i = 0; i < bufLen; i++) {
+						struct codepoint temp;
+						temp.numTokens = 0;
+						temp.sampleLog = log2(0);
+						temp.logTokenizations = log2(0);
+						temp.entropy = 0;
+						temp.valid = 0;
+						temp.content[0] = *(buffer + i);
+						temp.content[1] = '\0';
+						if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
+							struct node **curBufs = vocab;
+							struct node *backtrack = NULL;
+							int i = 0;
+							while (i < 256) {
+								if (curBufs[i] != NULL) {
+									backtrack = curBufs[i]->backtrack;
+									curBufs = curBufs[i]->next;
+									i = -1;
+								}
+								i++;
+								if (i == 256 && curBufs != vocab) {
+									if (backtrack == NULL) {
+										for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
+										free(vocab[i]);
+										vocab[i] = NULL;
+										curBufs = vocab;
+									} else {
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
+										free(backtrack->next[i]);
+										backtrack->next[i] = NULL;
+										curBufs = backtrack->next;
+										backtrack = backtrack->backtrack;
+									}
+								}
+							}
+							free(vocab);
+							fclose(dump);
+							fclose(vocabFile);
+							return 1;
+						}
+					}
+					numCodepoints += bufLen;
+				} else if (totLen) {
 					struct codepoint temp;
 					temp.numTokens = 0;
 					temp.sampleLog = log2(0);
 					temp.logTokenizations = log2(0);
 					temp.entropy = 0;
 					temp.valid = 0;
-					temp.content[0] = *(buffer + i);
-					temp.content[1] = '\0';
+					for (int i = 0; i < bufLen; i++) {
+						temp.content[i] = *(buffer + i);
+					}
+					temp.content[bufLen] = '\0';
 					if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
 						struct node **curBufs = vocab;
 						struct node *backtrack = NULL;
@@ -1427,55 +1470,12 @@ int main(int argc, char *argv[]) {
 							}
 						}
 						free(vocab);
-						fclose(dump);
 						fclose(vocabFile);
+						fclose(dump);
 						return 1;
 					}
+					numCodepoints++;
 				}
-				numCodepoints += bufLen;
-			} else if (totLen) {
-				struct codepoint temp;
-				temp.numTokens = 0;
-				temp.sampleLog = log2(0);
-				temp.logTokenizations = log2(0);
-				temp.entropy = 0;
-				temp.valid = 0;
-				for (int i = 0; i < bufLen; i++) {
-					temp.content[i] = *(buffer + i);
-				}
-				temp.content[bufLen] = '\0';
-				if (fwrite(&temp, sizeof(struct codepoint), 1, dump) != 1) {
-					struct node **curBufs = vocab;
-					struct node *backtrack = NULL;
-					int i = 0;
-					while (i < 256) {
-						if (curBufs[i] != NULL) {
-							backtrack = curBufs[i]->backtrack;
-							curBufs = curBufs[i]->next;
-							i = -1;
-						}
-						i++;
-						if (i == 256 && curBufs != vocab) {
-							if (backtrack == NULL) {
-								for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
-								free(vocab[i]);
-								vocab[i] = NULL;
-								curBufs = vocab;
-							} else {
-								for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
-								free(backtrack->next[i]);
-								backtrack->next[i] = NULL;
-								curBufs = backtrack->next;
-								backtrack = backtrack->backtrack;
-							}
-						}
-					}
-					free(vocab);
-					fclose(vocabFile);
-					fclose(dump);
-					return 1;
-				}
-				numCodepoints++;
 			}
 			bufLen = 0;
 			totLen = 0;
