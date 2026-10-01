@@ -704,12 +704,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 				i++;
 				if (i == 256 && curBufs != vocabs) {
 					if (backtrack == NULL) {
-						for (i = 0; vocabs[i]->next != curBufs; i++) {}
+						for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 						free(vocabs[i]);
 						vocabs[i] = NULL;
 						curBufs = vocabs;
 					} else {
-						for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+						for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 						free(backtrack->next[i]);
 						backtrack->next[i] = NULL;
 						curBufs = backtrack->next;
@@ -759,12 +759,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 					i++;
 					if (i == 256 && curBufs != vocabs) {
 						if (backtrack == NULL) {
-							for (i = 0; vocabs[i]->next != curBufs; i++) {}
+							for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 							free(vocabs[i]);
 							vocabs[i] = NULL;
 							curBufs = vocabs;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -804,12 +804,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 								i++;
 								if (i == 256 && curBufs != vocabs) {
 									if (backtrack == NULL) {
-										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 										free(vocabs[i]);
 										vocabs[i] = NULL;
 										curBufs = vocabs;
 									} else {
-										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 										free(backtrack->next[i]);
 										backtrack->next[i] = NULL;
 										curBufs = backtrack->next;
@@ -842,12 +842,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 								i++;
 								if (i == 256 && curBufs != vocabs) {
 									if (backtrack == NULL) {
-										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 										free(vocabs[i]);
 										vocabs[i] = NULL;
 										curBufs = vocabs;
 									} else {
-										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 										free(backtrack->next[i]);
 										backtrack->next[i] = NULL;
 										curBufs = backtrack->next;
@@ -905,12 +905,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 										i++;
 										if (i == 256 && curBufs != vocabs) {
 											if (backtrack == NULL) {
-												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 												free(vocabs[i]);
 												vocabs[i] = NULL;
 												curBufs = vocabs;
 											} else {
-												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 												free(backtrack->next[i]);
 												backtrack->next[i] = NULL;
 												curBufs = backtrack->next;
@@ -943,12 +943,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 										i++;
 										if (i == 256 && curBufs != vocabs) {
 											if (backtrack == NULL) {
-												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 												free(vocabs[i]);
 												vocabs[i] = NULL;
 												curBufs = vocabs;
 											} else {
-												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 												free(backtrack->next[i]);
 												backtrack->next[i] = NULL;
 												curBufs = backtrack->next;
@@ -980,12 +980,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 							i++;
 							if (i == 256 && curBufs != vocabs) {
 								if (backtrack == NULL) {
-									for (i = 0; vocabs[i]->next != curBufs; i++) {}
+									for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 									free(vocabs[i]);
 									vocabs[i] = NULL;
 									curBufs = vocabs;
 								} else {
-									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 									free(backtrack->next[i]);
 									backtrack->next[i] = NULL;
 									curBufs = backtrack->next;
@@ -1043,12 +1043,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 										i++;
 										if (i == 256 && curBufs != vocabs) {
 											if (backtrack == NULL) {
-												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 												free(vocabs[i]);
 												vocabs[i] = NULL;
 												curBufs = vocabs;
 											} else {
-												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 												free(backtrack->next[i]);
 												backtrack->next[i] = NULL;
 												curBufs = backtrack->next;
@@ -1081,12 +1081,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 										i++;
 										if (i == 256 && curBufs != vocabs) {
 											if (backtrack == NULL) {
-												for (i = 0; vocabs[i]->next != curBufs; i++) {}
+												for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 												free(vocabs[i]);
 												vocabs[i] = NULL;
 												curBufs = vocabs;
 											} else {
-												for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+												for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 												free(backtrack->next[i]);
 												backtrack->next[i] = NULL;
 												curBufs = backtrack->next;
@@ -1121,12 +1121,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 						i++;
 						if (i == 256 && curBufs != vocabs) {
 							if (backtrack == NULL) {
-								for (i = 0; vocabs[i]->next != curBufs; i++) {}
+								for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 								free(vocabs[i]);
 								vocabs[i] = NULL;
 								curBufs = vocabs;
 							} else {
-								for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+								for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 								free(backtrack->next[i]);
 								backtrack->next[i] = NULL;
 								curBufs = backtrack->next;
@@ -1180,12 +1180,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 								i++;
 								if (i == 256 && curBufs != vocabs) {
 									if (backtrack == NULL) {
-										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 										free(vocabs[i]);
 										vocabs[i] = NULL;
 										curBufs = vocabs;
 									} else {
-										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 										free(backtrack->next[i]);
 										backtrack->next[i] = NULL;
 										curBufs = backtrack->next;
@@ -1218,12 +1218,12 @@ size_t getVocab(FILE *vocabFile, struct node **vocabs, size_t *numVocabs) {
 								i++;
 								if (i == 256 && curBufs != vocabs) {
 									if (backtrack == NULL) {
-										for (i = 0; vocabs[i]->next != curBufs; i++) {}
+										for (i = 0; vocabs[i] == NULL || vocabs[i]->next != curBufs; i++) {}
 										free(vocabs[i]);
 										vocabs[i] = NULL;
 										curBufs = vocabs;
 									} else {
-										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 										free(backtrack->next[i]);
 										backtrack->next[i] = NULL;
 										curBufs = backtrack->next;
@@ -1295,12 +1295,12 @@ int main(int argc, char *argv[]) {
 			i++;
 			if (i == 256 && curBufs != vocab) {
 				if (backtrack == NULL) {
-					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 					free(vocab[i]);
 					vocab[i] = NULL;
 					curBufs = vocab;
 				} else {
-					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 					free(backtrack->next[i]);
 					backtrack->next[i] = NULL;
 					curBufs = backtrack->next;
@@ -1326,12 +1326,12 @@ int main(int argc, char *argv[]) {
 			i++;
 			if (i == 256 && curBufs != vocab) {
 				if (backtrack == NULL) {
-					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 					free(vocab[i]);
 					vocab[i] = NULL;
 					curBufs = vocab;
 				} else {
-					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 					free(backtrack->next[i]);
 					backtrack->next[i] = NULL;
 					curBufs = backtrack->next;
@@ -1364,12 +1364,12 @@ int main(int argc, char *argv[]) {
 				i++;
 				if (i == 256 && curBufs != vocab) {
 					if (backtrack == NULL) {
-						for (i = 0; vocab[i]->next != curBufs; i++) {}
+						for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 						free(vocab[i]);
 						vocab[i] = NULL;
 						curBufs = vocab;
 					} else {
-						for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+						for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 						free(backtrack->next[i]);
 						backtrack->next[i] = NULL;
 						curBufs = backtrack->next;
@@ -1413,12 +1413,12 @@ int main(int argc, char *argv[]) {
 							i++;
 							if (i == 256 && curBufs != vocab) {
 								if (backtrack == NULL) {
-									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 									free(vocab[i]);
 									vocab[i] = NULL;
 									curBufs = vocab;
 								} else {
-									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 									free(backtrack->next[i]);
 									backtrack->next[i] = NULL;
 									curBufs = backtrack->next;
@@ -1457,12 +1457,12 @@ int main(int argc, char *argv[]) {
 						i++;
 						if (i == 256 && curBufs != vocab) {
 							if (backtrack == NULL) {
-								for (i = 0; vocab[i]->next != curBufs; i++) {}
+								for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 								free(vocab[i]);
 								vocab[i] = NULL;
 								curBufs = vocab;
 							} else {
-								for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+								for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 								free(backtrack->next[i]);
 								backtrack->next[i] = NULL;
 								curBufs = backtrack->next;
@@ -1493,12 +1493,12 @@ int main(int argc, char *argv[]) {
 					i++;
 					if (i == 256 && curBufs != vocab) {
 						if (backtrack == NULL) {
-							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 							free(vocab[i]);
 							vocab[i] = NULL;
 							curBufs = vocab;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -1525,12 +1525,12 @@ int main(int argc, char *argv[]) {
 					i++;
 					if (i == 256 && curBufs != vocab) {
 						if (backtrack == NULL) {
-							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 							free(vocab[i]);
 							vocab[i] = NULL;
 							curBufs = vocab;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -1557,12 +1557,12 @@ int main(int argc, char *argv[]) {
 					i++;
 					if (i == 256 && curBufs != vocab) {
 						if (backtrack == NULL) {
-							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 							free(vocab[i]);
 							vocab[i] = NULL;
 							curBufs = vocab;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -1589,12 +1589,12 @@ int main(int argc, char *argv[]) {
 					i++;
 					if (i == 256 && curBufs != vocab) {
 						if (backtrack == NULL) {
-							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 							free(vocab[i]);
 							vocab[i] = NULL;
 							curBufs = vocab;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -1621,12 +1621,12 @@ int main(int argc, char *argv[]) {
 					i++;
 					if (i == 256 && curBufs != vocab) {
 						if (backtrack == NULL) {
-							for (i = 0; vocab[i]->next != curBufs; i++) {}
+							for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 							free(vocab[i]);
 							vocab[i] = NULL;
 							curBufs = vocab;
 						} else {
-							for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+							for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 							free(backtrack->next[i]);
 							backtrack->next[i] = NULL;
 							curBufs = backtrack->next;
@@ -1677,12 +1677,12 @@ int main(int argc, char *argv[]) {
 							i++;
 							if (i == 256 && curBufs != vocab) {
 								if (backtrack == NULL) {
-									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 									free(vocab[i]);
 									vocab[i] = NULL;
 									curBufs = vocab;
 								} else {
-									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 									free(backtrack->next[i]);
 									backtrack->next[i] = NULL;
 									curBufs = backtrack->next;
@@ -1719,12 +1719,12 @@ int main(int argc, char *argv[]) {
 								i++;
 								if (i == 256 && curBufs != vocab) {
 									if (backtrack == NULL) {
-										for (i = 0; vocab[i]->next != curBufs; i++) {}
+										for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 										free(vocab[i]);
 										vocab[i] = NULL;
 										curBufs = vocab;
 									} else {
-										for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+										for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 										free(backtrack->next[i]);
 										backtrack->next[i] = NULL;
 										curBufs = backtrack->next;
@@ -1776,12 +1776,12 @@ int main(int argc, char *argv[]) {
 							i++;
 							if (i == 256 && curBufs != vocab) {
 								if (backtrack == NULL) {
-									for (i = 0; vocab[i]->next != curBufs; i++) {}
+									for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 									free(vocab[i]);
 									vocab[i] = NULL;
 									curBufs = vocab;
 								} else {
-									for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+									for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 									free(backtrack->next[i]);
 									backtrack->next[i] = NULL;
 									curBufs = backtrack->next;
@@ -1812,12 +1812,12 @@ int main(int argc, char *argv[]) {
 			i++;
 			if (i == 256 && curBufs != vocab) {
 				if (backtrack == NULL) {
-					for (i = 0; vocab[i]->next != curBufs; i++) {}
+					for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 					free(vocab[i]);
 					vocab[i] = NULL;
 					curBufs = vocab;
 				} else {
-					for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+					for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 					free(backtrack->next[i]);
 					backtrack->next[i] = NULL;
 					curBufs = backtrack->next;
@@ -1842,12 +1842,12 @@ int main(int argc, char *argv[]) {
 		i++;
 		if (i == 256 && curBufs != vocab) {
 			if (backtrack == NULL) {
-				for (i = 0; vocab[i]->next != curBufs; i++) {}
+				for (i = 0; vocab[i] == NULL || vocab[i]->next != curBufs; i++) {}
 				free(vocab[i]);
 				vocab[i] = NULL;
 				curBufs = vocab;
 			} else {
-				for (i = 0; backtrack->next[i]->next != curBufs; i++) {}
+				for (i = 0; backtrack->next[i] == NULL || backtrack->next[i]->next != curBufs; i++) {}
 				free(backtrack->next[i]);
 				backtrack->next[i] = NULL;
 				curBufs = backtrack->next;
