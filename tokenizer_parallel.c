@@ -1511,7 +1511,7 @@ int main(int argc, char *argv[]) {
 				fclose(dump);
 				return 1;
 			}
-			if (fseek(dump, -1 * numCodepoints * sizeof(struct codepoint), SEEK_CUR) < 0) {
+			if (fseek(dump, -(long int)(numCodepoints * sizeof(struct codepoint)), SEEK_CUR) < 0) {
 				free(wrappedString);
 				struct node **curBufs = vocab;
 				struct node *backtrack = NULL;
@@ -1575,7 +1575,7 @@ int main(int argc, char *argv[]) {
 				fclose(vocabFile);
 				return 1;
 			}
-			if (fseek(dump, -1 * numCodepoints * sizeof(struct codepoint), SEEK_CUR) < 0) {
+			if (fseek(dump, -(long int)(numCodepoints * sizeof(struct codepoint)), SEEK_CUR) < 0) {
 				free(wrappedString);
 				struct node **curBufs = vocab;
 				struct node *backtrack = NULL;
