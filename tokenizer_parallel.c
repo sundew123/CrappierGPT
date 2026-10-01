@@ -1384,10 +1384,12 @@ int main(int argc, char *argv[]) {
 		}
 		if (ch == '\0' || (feof(stdin) && !start)) {
 			start = 1;
-			size_t utfValue = buffer[0] & ((1 << (7 - totLen)) - 1);
-			if (totLen > 0 && bufLen == totLen) {
-				for (int i = 1; i < totLen; i++) {
-					utfValue = (utfValue << 6) + (buffer[i] & 63);
+			if (totLen > 0) {
+				size_t utfValue = buffer[0] & ((1 << (7 - totLen)) - 1);
+				if (bufLen == totLen) {
+					for (int i = 1; i < totLen; i++) {
+						utfValue = (utfValue << 6) + (buffer[i] & 63);
+					}
 				}
 				if (bufLen < totLen || utfValue < 128 || utfValue > 1114111 || !(((utfValue >> 7) && totLen == 2) || ((utfValue >> 11) && totLen == 3) || ((utfValue >> 16) && totLen == 4))) {
 					for (char i = 0; i < bufLen; i++) {
